@@ -19,21 +19,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "dovecot/lib.h"
-#include "dovecot/array.h"
-#include "dovecot/buffer.h"
-#include "dovecot/hash.h"
-#include "dovecot/istream.h"
-#include "dovecot/ostream.h"
-#include "dovecot/ostream-private.h"
-#include "dovecot/str.h"
-#include "dovecot/safe-mkstemp.h"
-#include "dovecot/mail-user.h"
-#include "dovecot/mail-storage-private.h"
-#include "dovecot/index-storage.h"
-#include "dovecot/index-mail.h"
-#include "dovecot/strescape.h"
+#include <assert.h>
 #include <stdio.h>
+
+#include <dovecot/lib.h>
+#include <dovecot/array.h>
+#include <dovecot/buffer.h>
+#include <dovecot/hash.h>
+#include <dovecot/istream.h>
+#include <dovecot/ostream.h>
+#include <dovecot/ostream-private.h>
+#include <dovecot/str.h>
+#include <dovecot/safe-mkstemp.h>
+#include <dovecot/mail-user.h>
+#include <dovecot/mail-storage-private.h>
+#include <dovecot/index-storage.h>
+#include <dovecot/index-mail.h>
+#include <dovecot/strescape.h>
+
+#include <sodium/crypto_box.h>
+#include <sodium/crypto_pwhash.h>
+#include <sodium/utils.h>
 
 #include "scrambler-plugin.h"
 #include "scrambler-common.h"
@@ -50,25 +56,24 @@
 #define SCRAMBLER_USER_CONTEXT(obj) \
 	MODULE_CONTEXT(obj, scrambler_user_module)
 
-// Structs
-
 struct scrambler_user {
+  /* Dovecot module context. */
   union mail_user_module_context module_ctx;
-
-  bool enabled;
-  EVP_PKEY *public_key;
-  EVP_PKEY *private_key;
+  /* Is this user has enabled this plugin? */
+  unsigned int enabled : 1;
+  /* User keypair. */
+  unsigned char public_key[crypto_box_PUBLICKEYBYTES];
+  /* Indicate if the private key has been set. With inbound mail, the plugin
+   * doesn't have access to the private key thus being empy. */
+  unsigned int private_key_set : 1;
+  unsigned char private_key[crypto_box_SECRETKEYBYTES];
 };
 
 const char *scrambler_plugin_version = DOVECOT_ABI_VERSION;
 
-// Statics
-
 static MODULE_CONTEXT_DEFINE_INIT(scrambler_storage_module, &mail_storage_module_register);
 static MODULE_CONTEXT_DEFINE_INIT(scrambler_mail_module, &mail_module_register);
 static MODULE_CONTEXT_DEFINE_INIT(scrambler_user_module, &mail_user_module_register);
-
-// Functions
 
 static const char *
 scrambler_get_string_setting(struct mail_user *user, const char *name)
@@ -76,72 +81,104 @@ scrambler_get_string_setting(struct mail_user *user, const char *name)
   return mail_user_plugin_getenv(user, name);
 }
 
-static const char *
-scrambler_get_pem_string_setting(struct mail_user *user, const char *name)
-{
-  char *value = (char *)scrambler_get_string_setting(user, name);
-
-  if (value == NULL) {
-    return NULL;
-  }
-
-  scrambler_unescape_pem(value);
-  return value;
-}
-
-static unsigned int
+static int
 scrambler_get_integer_setting(struct mail_user *user, const char *name)
 {
   const char *value = scrambler_get_string_setting(user, name);
-  return value == NULL ? 0 : atoi(value);
+  if (value == NULL) {
+    return -1;
+  }
+  return atoi(value);
 }
 
-static EVP_PKEY *
-scrambler_get_pem_key_setting(struct mail_user *user, const char *name)
+static int
+scrambler_get_user_hexdata(struct mail_user *user, const char *param,
+                           unsigned char *out, size_t out_len)
 {
-  const char *value = scrambler_get_pem_string_setting(user, name);
+  const char *hex_str;
 
-  if (value == NULL) {
-    return NULL;
+  hex_str = scrambler_get_string_setting(user, param);
+  if (hex_str == NULL) {
+    goto error;
+  }
+  if (sodium_hex2bin(out, out_len, hex_str, strlen(hex_str),
+                     NULL, NULL, NULL)) {
+    user->error = p_strdup_printf(user->pool,
+                                  "Unable to convert %s for user %s.", param,
+                                  user->username);
+    goto error;
   }
 
-  return scrambler_pem_read_public_key(value);
+  /* Success! */
+  return 0;
+error:
+  return -1;
 }
 
 static void
 scrambler_mail_user_created(struct mail_user *user)
 {
+  int have_salt, password_fd;
+  unsigned char sk_salt[crypto_pwhash_SALTBYTES];
+  const char *password;
   struct mail_user_vfuncs *v = user->vlast;
   struct scrambler_user *suser;
 
   suser = p_new(user->pool, struct scrambler_user, 1);
+  memset(suser, 0, sizeof(*suser));
+
   suser->module_ctx.super = *v;
   user->vlast = &suser->module_ctx.super;
 
-  suser->enabled = !!scrambler_get_integer_setting(user, "scrambler_enabled");
-  suser->public_key = scrambler_get_pem_key_setting(user, "scrambler_public_key");
-
-  const char *plain_password = scrambler_get_string_setting(user, "scrambler_plain_password");
-  unsigned int plain_password_fd = scrambler_get_integer_setting(user, "scrambler_plain_password_fd");
-  const char *private_key = scrambler_get_pem_string_setting(user, "scrambler_private_key");
-  const char *private_key_salt = scrambler_get_string_setting(user, "scrambler_private_key_salt");
-  unsigned int private_key_iterations = scrambler_get_integer_setting(user, "scrambler_private_key_iterations");
-
-  if (plain_password == NULL && plain_password_fd != 0) {
-    plain_password = scrambler_read_line_fd(user->pool, plain_password_fd);
+  /* Does this user should use the scrambler or not? */
+  suser->enabled = scrambler_get_integer_setting(user, "scrambler_enabled");
+  if (suser->enabled == -1) {
+    /* Not present means disabled. */
+    suser->enabled = 0;
   }
 
-  if (plain_password != NULL && private_key != NULL && private_key_salt != NULL) {
-    const char *hashed_password = scrambler_hash_password(plain_password, private_key_salt, private_key_iterations);
-    suser->private_key = scrambler_pem_read_encrypted_private_key(private_key, hashed_password);
-    if (suser->private_key == NULL) {
+  /* Getting user public key. Without it, we can't do much so error if we
+   * can't find it. */
+  if (scrambler_get_user_hexdata(user, "scrambler_public_key",
+                                 suser->public_key,
+                                 sizeof(suser->public_key))) {
+    user->error = p_strdup_printf(user->pool,
+                                  "Unable to find public key for user %s.",
+                                  user->username);
+    goto end;
+  }
+
+  /* Get the user password that we'll use to . */
+  password = scrambler_get_string_setting(user, "scrambler_plain_password");
+  password_fd = scrambler_get_integer_setting(user, "scrambler_plain_password_fd");
+  if (password == NULL && password_fd >= 0) {
+    password = scrambler_read_line_fd(user->pool, password_fd);
+  }
+
+  /* Get the scrambler user salt. It's possible that it's not available. */
+  have_salt = !!scrambler_get_user_hexdata(user, "scrambler_private_key_salt",
+                                           sk_salt, sizeof(sk_salt));
+
+  /* If we have a password and a salt, derive the private key. */
+  if (password != NULL && have_salt) {
+    if (crypto_pwhash(suser->private_key, sizeof(suser->private_key),
+                      password, strlen(password), sk_salt,
+                      crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                      crypto_pwhash_MEMLIMIT_INTERACTIVE,
+                      crypto_pwhash_ALG_DEFAULT) < 0) {
       user->error = p_strdup_printf(user->pool,
-                                    "Failed to load and decrypt the private key. May caused by an invalid password.");
+                                    "Unable to derive private key for user %s.",
+                                    user->username);
+      goto end;
     }
+    suser->private_key_set = 1;
   } else {
-    suser->private_key = NULL;
+    /* This means we are receiving an email for a user so we don't have access
+     * to the private key material. */
+    suser->private_key_set = 0;
   }
 
+end:
   MODULE_CONTEXT_SET(user, scrambler_user_module, suser);
 }
 
@@ -150,40 +187,38 @@ scrambler_mail_save_begin(struct mail_save_context *context,
                           struct istream *input)
 {
   struct mailbox *box = context->transaction->box;
-  struct scrambler_user *suser = SCRAMBLER_USER_CONTEXT(box->storage->user);
   union mailbox_module_context *mbox = SCRAMBLER_CONTEXT(box);
+  struct scrambler_user *suser = SCRAMBLER_USER_CONTEXT(box->storage->user);
   struct ostream *output;
-
-  if (suser->enabled && suser->public_key == NULL) {
-    i_error("scrambler_mail_save_begin: encryption is enabled, but no public key is available");
-    return -1;
-  }
 
   if (mbox->super.save_begin(context, input) < 0) {
     return -1;
   }
 
-  if (suser->enabled) {
-    // TODO: find a better solution for this. this currently works, because
-    // there is only one other ostream (zlib) in the setup. the scrambler should
-    // be added to the other end of the ostream chain, not to the
-    // beginning (the usual way).
-    if (context->data.output->real_stream->parent == NULL) {
-      output = scrambler_ostream_create(context->data.output, suser->public_key);
-      o_stream_unref(&context->data.output);
-      context->data.output = output;
-    } else {
-      output = scrambler_ostream_create(context->data.output->real_stream->parent, suser->public_key);
-      o_stream_unref(&context->data.output->real_stream->parent);
-      context->data.output->real_stream->parent = output;
-    }
-#ifdef DEBUG_STREAMS
-    i_debug("scrambler write encrypted mail");
-  } else {
+  if (!suser->enabled) {
     i_debug("scrambler write plain mail");
-#endif
+    goto end;
+
   }
 
+  // TODO: find a better solution for this. this currently works, because
+  // there is only one other ostream (zlib) in the setup. the scrambler should
+  // be added to the other end of the ostream chain, not to the
+  // beginning (the usual way).
+  if (context->data.output->real_stream->parent == NULL) {
+    output = scrambler_ostream_create(context->data.output,
+                                      suser->public_key);
+    o_stream_unref(&context->data.output);
+    context->data.output = output;
+  } else {
+    output = scrambler_ostream_create(context->data.output->real_stream->parent,
+                                      suser->public_key);
+    o_stream_unref(&context->data.output->real_stream->parent);
+    context->data.output->real_stream->parent = output;
+  }
+  i_debug("scrambler write encrypted mail");
+
+end:
   return 0;
 }
 
@@ -215,7 +250,9 @@ scrambler_istream_opened(struct mail *_mail, struct istream **stream)
   struct istream *input;
 
   input = *stream;
-  *stream = scrambler_istream_create(input, suser->private_key);
+  assert(suser->private_key_set);
+  *stream = scrambler_istream_create(input, suser->public_key,
+                                     suser->private_key);
   i_stream_unref(&input);
 
   int result = mmail->super.istream_opened(_mail, stream);
@@ -248,7 +285,10 @@ static struct mail_storage_hooks scrambler_mail_storage_hooks = {
 void
 scrambler_plugin_init(struct module *module)
 {
-  scrambler_initialize();
+  if (scrambler_initialize() < 0) {
+    /* Don't hook anything has we weren't able to initialize ourself. */
+    return;
+  }
   mail_storage_hooks_add(module, &scrambler_mail_storage_hooks);
 }
 

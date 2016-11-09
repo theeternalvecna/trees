@@ -22,30 +22,13 @@
 #ifndef SCRAMBLER_COMMON_H
 #define SCRAMBLER_COMMON_H
 
-#include <openssl/evp.h>
+#include <sodium.h>
 
-// Defines
-
-#define MAGIC_SIZE (sizeof(scrambler_header) + 1)
-#define ENCRYPTED_HEADER_SIZE (304)
-#define CHUNK_SIZE (8192)
-#define CHUNK_TAG_SIZE (32)
-#define ENCRYPTED_CHUNK_SIZE ((int)sizeof(unsigned short) + CHUNK_SIZE + CHUNK_TAG_SIZE)
-#define MAC_KEY_SIZE (32)
-#define MAXIMAL_PASSWORD_LENGTH (256)
-
-#define ASSERT_SUCCESS(command, expected_result, function_name, error_text, error_result) \
-    if ((expected_result) != (command)) { \
-        i_error("%s: %s", function_name, error_text); \
-        return (error_result); \
-    }
-
-#define ASSERT_OPENSSL_SUCCESS(command, expected_result, function_name, error_text, error_result) \
-    if ((expected_result) != (command)) { \
-        i_error("%s: %s", function_name, error_text); \
-        i_error_openssl(function_name); \
-        return (error_result); \
-    }
+#define MAGIC_SIZE (sizeof(scrambler_header))
+#define CHUNK_SIZE 8192
+#define ENCRYPTED_CHUNK_SIZE (crypto_box_SEALBYTES + CHUNK_SIZE)
+#define MAXIMAL_PASSWORD_LENGTH 256
+#define MAX_ISTREAM_BUFFER_SIZE (ENCRYPTED_CHUNK_SIZE * 2)
 
 #define MIN(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -57,29 +40,11 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
-// Enums
+extern const char scrambler_header[3];
 
-enum packages {
-    PACKAGE_RSA_2048_AES_128_CTR_HMAC = 0x00
-};
-
-// Constants
-const char scrambler_header[3];
-
-// Functions
-
-void scrambler_initialize(void);
+int scrambler_initialize(void);
 
 const char *scrambler_read_line_fd(pool_t pool, int file_descriptor);
-
-const EVP_CIPHER *scrambler_cipher(enum packages package);
-
-void scrambler_generate_mac(unsigned char *tag, unsigned int *tag_size,
-                            const unsigned char *sources[],
-                            size_t source_sizes[],
-                            const unsigned char *key, size_t key_size);
-
-void i_error_openssl(const char *function_name);
 
 void i_debug_hex(const char *prefix, const unsigned char *data, size_t size);
 

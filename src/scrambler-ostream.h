@@ -26,6 +26,6 @@
 #include <openssl/evp.h>
 
 struct ostream *scrambler_ostream_create(struct ostream *parent_ostream,
-                                         EVP_PKEY *public_key);
+                                         const unsigned char *public_key);
 
 #endif /* SCRAMBLER_OSTREAM_H */

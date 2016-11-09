@@ -26,6 +26,7 @@
 #include <openssl/evp.h>
 
 struct istream *scrambler_istream_create(struct istream *input,
-                                         EVP_PKEY *private_key);
+                                         const unsigned char *public_key,
+                                         unsigned char *private_key);
 
 #endif /* SCRAMBLER_ISTREAM_H */

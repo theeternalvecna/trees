@@ -19,29 +19,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <dovecot/lib.h>
 #include <dovecot/base64.h>
 #include <dovecot/buffer.h>
 #include <dovecot/str.h>
-#include <unistd.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-#include <openssl/pem.h>
-#include <xcrypt.h>
-#include <errno.h>
-#include <string.h>
+
+#include <sodium.h>
 
 #include "scrambler-common.h"
 
 const char scrambler_header[] = { 0xee, 0xff, 0xcc };
 
-void
+int
 scrambler_initialize(void)
 {
-    OpenSSL_add_all_algorithms();
-    ERR_load_crypto_strings();
-    i_info("scrambler plugin initialized");
+  if (sodium_init() < 0) {
+    i_info("scrambler plugin libsodium failed to initialized.");
+    return -1;
+  }
+  i_info("scrambler plugin initialized");
+  return 0;
 }
 
 const char *
@@ -71,55 +72,6 @@ scrambler_read_line_fd(pool_t pool, int fd)
     i_error("error reading from fd %d: %s (%d)", fd, strerror(errno), errno);
 
   return result;
-}
-
-const EVP_CIPHER *
-scrambler_cipher(enum packages package)
-{
-  switch (package) {
-  case PACKAGE_RSA_2048_AES_128_CTR_HMAC:
-      return EVP_aes_128_ctr();
-  }
-  return NULL;
-}
-
-void
-scrambler_generate_mac(unsigned char *tag, unsigned int *tag_size,
-                       const unsigned char *sources[],
-                       size_t source_sizes[], const unsigned char *key,
-                       size_t key_size)
-{
-  HMAC_CTX context;
-  HMAC_CTX_init(&context);
-  HMAC_Init_ex(&context, key, key_size, EVP_sha256(), NULL);
-
-  unsigned int index = 0;
-  const unsigned char *source = sources[index];
-  size_t source_size = source_sizes[index];
-  while (source != NULL) {
-    HMAC_Update(&context, source, source_size);
-
-    index++;
-    source = sources[index];
-    source_size = source_sizes[index];
-  }
-
-  HMAC_Final(&context, tag, tag_size);
-
-  HMAC_CTX_cleanup(&context);
-}
-
-void
-i_error_openssl(const char *function_name)
-{
-  char *output;
-  BIO *output_bio = BIO_new(BIO_s_mem());
-  ERR_print_errors(output_bio);
-  BIO_get_mem_data(output_bio, &output);
-
-  i_error("%s: %s", function_name, output);
-
-  BIO_free_all(output_bio);
 }
 
 void
