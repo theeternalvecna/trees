@@ -316,9 +316,8 @@ scrambler_istream_close(struct iostream_private *stream, bool close_parent)
 {
   struct scrambler_istream *sstream = (struct scrambler_istream *)stream;
 
-  /* Attempt at wiping the private key. XXX: This isn't guaranteed so we
-   * should try to make the compiler not optimize it out. */
-  memset(sstream->private_key, 'a', crypto_box_SECRETKEYBYTES);
+  /* Wipe private key material. */
+  sodium_memzero(sstream->private_key, crypto_box_SECRETKEYBYTES);
 
 #ifdef DEBUG_STREAMS
   i_debug("scrambler istream close - %u bytes in / %u bytes out / "
