@@ -37,9 +37,7 @@
 #include <dovecot/index-mail.h>
 #include <dovecot/strescape.h>
 
-#include <sodium/crypto_box.h>
-#include <sodium/crypto_pwhash.h>
-#include <sodium/utils.h>
+#include <sodium.h>
 
 #include "scrambler-plugin.h"
 #include "scrambler-common.h"
@@ -81,6 +79,16 @@ scrambler_get_string_setting(struct mail_user *user, const char *name)
   return mail_user_plugin_getenv(user, name);
 }
 
+static unsigned long long int
+scrambler_get_ullong_setting(struct mail_user *user, const char *name)
+{
+  const char *value = scrambler_get_string_setting(user, name);
+  if (value == NULL) {
+    return ULLONG_MAX;
+  }
+  return strtoull(value, NULL, 10);
+}
+
 static int
 scrambler_get_integer_setting(struct mail_user *user, const char *name)
 {
@@ -115,12 +123,89 @@ error:
   return -1;
 }
 
+static int
+scrambler_get_private_key(struct mail_user *user,
+                          struct scrambler_user *suser)
+{
+  int have_salt, password_fd;
+  unsigned long long opslimit, memlimit;
+  unsigned char pw_salt[crypto_pwhash_SALTBYTES];
+  unsigned char sk_nonce[crypto_secretbox_NONCEBYTES];
+  /* This is the key to unlock the secretbox. */
+  unsigned char sk[crypto_secretbox_KEYBYTES];
+  /* Encrypted secretbox that we need to open which is the size of a crypto
+   * sealed box and the MAC data. */
+  unsigned char secretbox[crypto_secretbox_MACBYTES +
+                          crypto_box_SECRETKEYBYTES];
+  const char *password;
+
+  /* Get the user password that we'll use to . */
+  password = scrambler_get_string_setting(user, "scrambler_password");
+  password_fd = scrambler_get_integer_setting(user, "scrambler_password_fd");
+  if (password == NULL && password_fd >= 0) {
+    password = scrambler_read_line_fd(user->pool, password_fd);
+  }
+
+  /* Get the nonce. */
+  if (scrambler_get_user_hexdata(user, "scrambler_sk_nonce",
+                                 sk_nonce, sizeof(sk_nonce))) {
+    user->error = p_strdup_printf(user->pool,
+                                  "Unable to find nonce value for user %s.",
+                                  user->username);
+    goto error;
+  }
+
+  /* Get the opslimit and memlimit. */
+  opslimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_opslimit");
+  if (opslimit == ULLONG_MAX) {
+    goto error;
+  }
+  memlimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_memlimit");
+  if (memlimit == ULLONG_MAX) {
+    goto error;
+  }
+
+  /* Get the scrambler user salt. It's possible that it's not available. */
+  have_salt = !!scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
+                                           pw_salt, sizeof(pw_salt));
+  if (!have_salt || password == NULL) {
+    goto end;
+  }
+
+  /* Derive key from password to open the secretbox containing the private
+   * key of the user. */
+  if (crypto_pwhash(sk, sizeof(sk),
+                    password, strlen(password), pw_salt,
+                    opslimit, (size_t) memlimit,
+                    crypto_pwhash_ALG_DEFAULT) < 0) {
+    user->error = p_strdup_printf(user->pool,
+                                  "Unable to derive private key for user %s.",
+                                  user->username);
+    goto error;
+  }
+
+  if (scrambler_get_user_hexdata(user, "scrambler_locked_secretbox",
+                                 secretbox, sizeof(secretbox))) {
+    goto error;
+  }
+
+  if (crypto_secretbox_open_easy(suser->private_key, secretbox,
+                                 sizeof(secretbox), sk_nonce, sk) < 0) {
+    goto error;
+  }
+  /* Got the private key! */
+  suser->private_key_set = 1;
+
+end:
+  return 0;
+error:
+  sodium_memzero(sk, sizeof(sk));
+  return -1;
+}
+
 static void
 scrambler_mail_user_created(struct mail_user *user)
 {
-  int have_salt, password_fd;
-  unsigned char sk_salt[crypto_pwhash_SALTBYTES];
-  const char *password;
   struct mail_user_vfuncs *v = user->vlast;
   struct scrambler_user *suser;
 
@@ -133,8 +218,10 @@ scrambler_mail_user_created(struct mail_user *user)
   /* Does this user should use the scrambler or not? */
   suser->enabled = scrambler_get_integer_setting(user, "scrambler_enabled");
   if (suser->enabled == -1) {
-    /* Not present means disabled. */
+    /* Not present means disabled. Stop right now because we won't use
+     * anything of this plugin for the user. */
     suser->enabled = 0;
+    goto end;
   }
 
   /* Getting user public key. Without it, we can't do much so error if we
@@ -148,34 +235,16 @@ scrambler_mail_user_created(struct mail_user *user)
     goto end;
   }
 
-  /* Get the user password that we'll use to . */
-  password = scrambler_get_string_setting(user, "scrambler_plain_password");
-  password_fd = scrambler_get_integer_setting(user, "scrambler_plain_password_fd");
-  if (password == NULL && password_fd >= 0) {
-    password = scrambler_read_line_fd(user->pool, password_fd);
-  }
-
-  /* Get the scrambler user salt. It's possible that it's not available. */
-  have_salt = !!scrambler_get_user_hexdata(user, "scrambler_private_key_salt",
-                                           sk_salt, sizeof(sk_salt));
-
-  /* If we have a password and a salt, derive the private key. */
-  if (password != NULL && have_salt) {
-    if (crypto_pwhash(suser->private_key, sizeof(suser->private_key),
-                      password, strlen(password), sk_salt,
-                      crypto_pwhash_OPSLIMIT_INTERACTIVE,
-                      crypto_pwhash_MEMLIMIT_INTERACTIVE,
-                      crypto_pwhash_ALG_DEFAULT) < 0) {
-      user->error = p_strdup_printf(user->pool,
-                                    "Unable to derive private key for user %s.",
-                                    user->username);
-      goto end;
-    }
-    suser->private_key_set = 1;
-  } else {
-    /* This means we are receiving an email for a user so we don't have access
-     * to the private key material. */
-    suser->private_key_set = 0;
+  /* If there are no password available or missing the salt, we'll consider
+   * that we don't have access to private key thus it could be an inbound
+   * email. If we are successful at getting the private key, this flag will
+   * be set to 1. */
+  suser->private_key_set = 0;
+  if (scrambler_get_private_key(user, suser) < 0) {
+    user->error = p_strdup_printf(user->pool,
+                                  "Error getting private key for user %s.",
+                                  user->username);
+    goto end;
   }
 
 end:
