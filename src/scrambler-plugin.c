@@ -183,9 +183,9 @@ scrambler_get_private_key(struct mail_user *user,
   i_debug("MemLimit: %llu", memlimit);
 
   /* Get the scrambler user salt. It's possible that it's not available. */
-  have_salt = !!scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
-                                           pw_salt, sizeof(pw_salt));
-  if (!have_salt || password == NULL) {
+  have_salt = scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
+                                         pw_salt, sizeof(pw_salt));
+  if (have_salt == -1 || password == NULL) {
     i_debug("No salt!");
     goto end;
   }
