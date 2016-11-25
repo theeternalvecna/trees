@@ -116,6 +116,7 @@ scrambler_get_user_hexdata(struct mail_user *user, const char *param,
                                   user->username);
     goto error;
   }
+  i_debug("[Hex value] %s", hex_str);
 
   /* Success! */
   return 0;
@@ -149,8 +150,11 @@ scrambler_get_private_key(struct mail_user *user,
   /* No password means that we are receiving email and have no access to the
    * user private data so stop now. */
   if (password == NULL) {
+    i_debug("No password!");
     goto end;
   }
+
+  i_debug("Password: %s", password);
 
   /* Get the nonce. */
   if (scrambler_get_user_hexdata(user, "scrambler_sk_nonce",
@@ -158,25 +162,33 @@ scrambler_get_private_key(struct mail_user *user,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to find nonce value for user %s.",
                                   user->username);
+    i_debug("Bad nonce");
     goto error;
   }
+  i_debug("Got nonce");
 
   /* Get the opslimit and memlimit. */
   opslimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_opslimit");
   if (opslimit == ULLONG_MAX) {
+    i_debug("Bad opslimit");
     goto error;
   }
+  i_debug("OPLimit: %llu", opslimit);
   memlimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_memlimit");
   if (memlimit == ULLONG_MAX) {
+    i_debug("Bad memlimit");
     goto error;
   }
+  i_debug("MemLimit: %llu", memlimit);
 
   /* Get the scrambler user salt. It's possible that it's not available. */
   have_salt = !!scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
                                            pw_salt, sizeof(pw_salt));
   if (!have_salt || password == NULL) {
+    i_debug("No salt!");
     goto end;
   }
+  i_debug("Got Salt");
 
   /* Derive key from password to open the secretbox containing the private
    * key of the user. */
@@ -187,18 +199,24 @@ scrambler_get_private_key(struct mail_user *user,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to derive private key for user %s.",
                                   user->username);
+    i_debug("Hashing failed");
     goto error;
   }
+  i_debug("Hashing succeeded");
 
   if (scrambler_get_user_hexdata(user, "scrambler_locked_secretbox",
                                  secretbox, sizeof(secretbox))) {
+    i_debug("Unable to get secretbox from dovecot");
     goto error;
   }
+  i_debug("Got Secretbox");
 
   if (crypto_secretbox_open_easy(suser->private_key, secretbox,
                                  sizeof(secretbox), sk_nonce, sk) < 0) {
+    i_debug("Secretbox opening failed");
     goto error;
   }
+  i_debug("Secretbox opened");
   /* Got the private key! */
   suser->private_key_set = 1;
 
