@@ -203,7 +203,7 @@ scrambler_get_private_key(struct mail_user *user,
     i_debug("Hashing failed");
     goto error;
   }
-  i_debug("Hashing succeeded");
+  i_debug_hex("[Hash succeded]", sk, sizeof(sk));
 
   if (scrambler_get_user_hexdata(user, "scrambler_locked_secretbox",
                                  secretbox, sizeof(secretbox))) {
