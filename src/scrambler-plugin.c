@@ -106,6 +106,7 @@ scrambler_get_user_hexdata(struct mail_user *user, const char *param,
   const char *hex_str;
 
   hex_str = scrambler_get_string_setting(user, param);
+  i_debug("[Hex value for %s] %s", param, hex_str);
   if (hex_str == NULL) {
     goto error;
   }
@@ -114,9 +115,9 @@ scrambler_get_user_hexdata(struct mail_user *user, const char *param,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to convert %s for user %s.", param,
                                   user->username);
+    i_debug("Failing to hex2bin for %s", param);
     goto error;
   }
-  i_debug("[Hex value] %s", hex_str);
 
   /* Success! */
   return 0;
@@ -241,6 +242,7 @@ scrambler_mail_user_created(struct mail_user *user)
 
   /* Does this user should use the scrambler or not? */
   suser->enabled = scrambler_get_integer_setting(user, "scrambler_enabled");
+  i_debug("Enabled: %d", suser->enabled);
   if (suser->enabled == -1) {
     /* Not present means disabled. Stop right now because we won't use
      * anything of this plugin for the user. */
@@ -256,6 +258,7 @@ scrambler_mail_user_created(struct mail_user *user)
     user->error = p_strdup_printf(user->pool,
                                   "Unable to find public key for user %s.",
                                   user->username);
+    i_debug("Public key failed!");
     goto end;
   }
 
@@ -268,6 +271,7 @@ scrambler_mail_user_created(struct mail_user *user)
     user->error = p_strdup_printf(user->pool,
                                   "Error getting private key for user %s.",
                                   user->username);
+    i_debug("Private key failed!");
     goto end;
   }
 
