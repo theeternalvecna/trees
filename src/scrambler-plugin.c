@@ -146,6 +146,12 @@ scrambler_get_private_key(struct mail_user *user,
     password = scrambler_read_line_fd(user->pool, password_fd);
   }
 
+  /* No password means that we are receiving email and have no access to the
+   * user private data so stop now. */
+  if (password == NULL) {
+    goto end;
+  }
+
   /* Get the nonce. */
   if (scrambler_get_user_hexdata(user, "scrambler_sk_nonce",
                                  sk_nonce, sizeof(sk_nonce))) {
