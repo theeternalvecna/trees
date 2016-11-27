@@ -219,8 +219,8 @@ scrambler_get_private_key(struct mail_user *user,
     goto error;
   }
   i_debug("Secretbox opened");
-  i_debug("[secretbox] sk", suser->private_key, sizeof(suser->private_key));
-  i_debug("[secretbox] pk", suser->public_key, sizeof(suser->public_key));
+  i_debug_hex("[secretbox] sk", suser->private_key, sizeof(suser->private_key));
+  i_debug_hex("[secretbox] pk", suser->public_key, sizeof(suser->public_key));
   /* Got the private key! */
   suser->private_key_set = 1;
 
