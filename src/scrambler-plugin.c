@@ -255,10 +255,7 @@ scrambler_mail_user_created(struct mail_user *user)
   if (scrambler_get_user_hexdata(user, "scrambler_public_key",
                                  suser->public_key,
                                  sizeof(suser->public_key))) {
-    user->error = p_strdup_printf(user->pool,
-                                  "Unable to find public key for user %s.",
-                                  user->username);
-    i_debug("Public key failed!");
+    i_debug("Unable to find public key for user %s", user->username);
     goto end;
   }
 
