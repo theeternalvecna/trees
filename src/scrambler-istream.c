@@ -139,15 +139,16 @@ end:
 static ssize_t
 scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
                                      unsigned char *destination,
-                                     const unsigned char *source)
+                                     const unsigned char *source,
+                                     size_t source_size)
 {
 #ifdef DEBUG_STREAMS
-  sstream->in_byte_count += ENCRYPTED_CHUNK_SIZE;
+  sstream->in_byte_count += source_size;
 #endif
-  i_debug_hex("[decrypt] scrambler source", destination,
-              ENCRYPTED_CHUNK_SIZE);
+  i_debug_hex("[decrypt] scrambler source", source,
+              source_size);
   ssize_t ret = crypto_box_seal_open(destination, source,
-                                     ENCRYPTED_CHUNK_SIZE,
+                                     source_size,
                                      sstream->public_key,
                                      sstream->private_key);
   if (ret > 0) {
@@ -190,7 +191,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
     }
 
     result = scrambler_istream_read_decrypt_chunk(sstream, destination,
-                                                  source);
+                                                  source, source_end - source);
     if (result < 0) {
       return result;
     }
@@ -212,7 +213,8 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
         return -1;
       }
 
-      result = scrambler_istream_read_decrypt_chunk(sstream, destination, source);
+      result = scrambler_istream_read_decrypt_chunk(sstream, destination, source,
+                                                    source_end - source);
       if (result < 0) {
         stream->istream.stream_errno = EIO;
         return result;
