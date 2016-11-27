@@ -83,6 +83,7 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
     return ret;
   }
   i_debug("scrambler Sending ciphertext of size %lu bytes", ciphertext_len);
+  i_debug_hex("[box seal]", ciphertext, ciphertext_len);
   o_stream_send(sstream->ostream.parent, ciphertext, ciphertext_len);
 
 #ifdef DEBUG_STREAMS
