@@ -76,7 +76,7 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   i_debug_hex("chunk", chunk, chunk_size);
 #endif
 
-  ret = crypto_box_seal(ciphertext, chunk, ciphertext_len,
+  ret = crypto_box_seal(ciphertext, chunk, chunk_size,
                         sstream->public_key);
   if (ret < 0) {
     sstream->ostream.ostream.stream_errno = EACCES;
