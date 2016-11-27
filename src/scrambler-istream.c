@@ -138,7 +138,9 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
                                      unsigned char *destination,
                                      const unsigned char *source)
 {
-
+#ifdef DEBUG_STREAMS
+  sstream->in_byte_count += ENCRYPTED_CHUNK_SIZE;
+#endif
   i_debug_hex("[decrypt] scrambler source", destination,
               ENCRYPTED_CHUNK_SIZE);
   ssize_t ret = crypto_box_seal_open(destination, source,
@@ -151,6 +153,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
   } else {
     i_debug("[decrypt] scrambler failed with %d", (int) ret);
   }
+  sstream->chunk_index++;
   return ret;
 }
 
