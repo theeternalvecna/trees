@@ -138,8 +138,20 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
                                      unsigned char *destination,
                                      const unsigned char *source)
 {
-  return crypto_box_seal_open(destination, source, ENCRYPTED_CHUNK_SIZE,
-                              sstream->public_key, sstream->private_key);
+
+  i_debug_hex("[decrypt] scrambler source", destination,
+              ENCRYPTED_CHUNK_SIZE);
+  ssize_t ret = crypto_box_seal_open(destination, source,
+                                     ENCRYPTED_CHUNK_SIZE,
+                                     sstream->public_key,
+                                     sstream->private_key);
+  if (ret > 0) {
+    i_debug_hex("[decrypt] scrambler destination", destination,
+                ret);
+  } else {
+    i_debug("[decrypt] scrambler failed with %d", (int) ret);
+  }
+  return ret;
 }
 
 static ssize_t
