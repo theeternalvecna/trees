@@ -61,6 +61,7 @@ struct scrambler_user {
   unsigned int enabled : 1;
   /* User keypair. */
   unsigned char public_key[crypto_box_PUBLICKEYBYTES];
+  unsigned int public_key_set : 1;
   /* Indicate if the private key has been set. With inbound mail, the plugin
    * doesn't have access to the private key thus being empy. */
   unsigned int private_key_set : 1;
@@ -255,9 +256,11 @@ scrambler_mail_user_created(struct mail_user *user)
   if (scrambler_get_user_hexdata(user, "scrambler_public_key",
                                  suser->public_key,
                                  sizeof(suser->public_key))) {
-    i_debug("Unable to find public key for user %s", user->username);
+    i_debug("Unable to find public key for user: %s", user->username);
+    i_debug("Unable to find public key for home: %s", user->set->mail_home);
     goto end;
   }
+  suser->public_key_set = 1;
 
   /* If there are no password available or missing the salt, we'll consider
    * that we don't have access to private key thus it could be an inbound
@@ -292,7 +295,11 @@ scrambler_mail_save_begin(struct mail_save_context *context,
   if (!suser->enabled) {
     i_debug("scrambler write plain mail");
     goto end;
+  }
 
+  if (!suser->public_key_set) {
+    i_debug("scrambler user public key unset. Skipping.");
+    goto end;
   }
 
   // TODO: find a better solution for this. this currently works, because
