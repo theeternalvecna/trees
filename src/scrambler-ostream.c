@@ -57,7 +57,7 @@ scrambler_ostream_send_header(struct scrambler_ostream *sstream)
 #ifdef DEBUG_STREAMS
   sstream->out_byte_count += sizeof(scrambler_header);
 #endif
-  i_debug("scrambler sending header %02x %02x %02x (ret: %d)", scrambler_header[0],
+  i_debug("scrambler sending header %x %x %x (ret: %d)", scrambler_header[0],
           scrambler_header[1], scrambler_header[2], (int) ret);
   return ret;
 }
