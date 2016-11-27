@@ -57,6 +57,8 @@ scrambler_ostream_send_header(struct scrambler_ostream *sstream)
 #ifdef DEBUG_STREAMS
   sstream->out_byte_count += sizeof(scrambler_header);
 #endif
+  i_debug("scrambler sending header %02x %02x %02x (ret: %d)", scrambler_header[0],
+          scrambler_header[1], scrambler_header[2], (int) ret);
   return ret;
 }
 
@@ -80,6 +82,7 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
     sstream->ostream.ostream.stream_errno = EACCES;
     return ret;
   }
+  i_debug("scrambler Sending ciphertext of size %lu bytes", ciphertext_len);
   o_stream_send(sstream->ostream.parent, ciphertext, ciphertext_len);
 
 #ifdef DEBUG_STREAMS

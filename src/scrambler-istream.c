@@ -98,6 +98,7 @@ scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
   } else {
 #ifdef DEBUG_STREAMS
     i_debug("istream read plain mail");
+    i_debug_hex("chunk", source, 32);
 #endif
     sstream->mode = ISTREAM_MODE_PLAIN;
   }

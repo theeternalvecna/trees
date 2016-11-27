@@ -317,7 +317,8 @@ scrambler_mail_save_begin(struct mail_save_context *context,
     o_stream_unref(&context->data.output->real_stream->parent);
     context->data.output->real_stream->parent = output;
   }
-  i_debug("scrambler write encrypted mail");
+  i_debug("scrambler write encrypted mail with public key:");
+  i_debug_hex("KEY", suser->public_key, sizeof(suser->public_key));
 
 end:
   return 0;
