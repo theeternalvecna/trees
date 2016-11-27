@@ -90,7 +90,7 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
 #endif
 
   sstream->chunk_index++;
-  return chunk_size;
+  return ciphertext_len;
 }
 
 static ssize_t
@@ -174,11 +174,10 @@ scrambler_ostream_flush(struct ostream_private *stream)
   }
   sstream->flushed = 1;
 
+end:
 #ifdef DEBUG_STREAMS
   i_debug("scrambler ostream flush (%d)", (int)result);
 #endif
-
-end:
   return result;
 }
 
