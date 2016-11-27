@@ -254,11 +254,18 @@ scrambler_istream_read_plain(struct scrambler_istream *sstream)
 static ssize_t
 scrambler_istream_read(struct istream_private *stream)
 {
+  int ret;
   struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
 
+  if (sstream->mode == ISTREAM_MODE_DETECT) {
+    ret = scrambler_istream_read_detect(sstream);
+    if (ret < 0) {
+      return ret;
+    }
+  }
+
+  /* We've now detected the mode, process it. */
   switch (sstream->mode) {
-  case ISTREAM_MODE_DETECT:
-    return scrambler_istream_read_detect(sstream);
   case ISTREAM_MODE_DECRYPT:
     return scrambler_istream_read_decrypt(sstream);
   case ISTREAM_MODE_PLAIN:
