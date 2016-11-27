@@ -32,7 +32,7 @@
 
 #include "scrambler-common.h"
 
-const char scrambler_header[] = { 0xee, 0xff, 0xcc };
+const unsigned char scrambler_header[] = { 0xee, 0xff, 0xcc };
 
 int
 scrambler_initialize(void)

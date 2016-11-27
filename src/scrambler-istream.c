@@ -84,6 +84,8 @@ scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
 {
   /* Check for the scrambler header and if so we have an encrypted email that
    * we'll try to decrypt. */
+  i_debug_hex("source header   ", source, sizeof(scrambler_header));
+  i_debug_hex("scrambler header", scrambler_header, sizeof(scrambler_header));
   if (memcmp(scrambler_header, source, sizeof(scrambler_header))) {
 #ifdef DEBUG_STREAMS
     i_debug("istream read encrypted mail");

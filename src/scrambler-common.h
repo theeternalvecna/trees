@@ -40,7 +40,7 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
-extern const char scrambler_header[3];
+extern const unsigned char scrambler_header[3];
 
 int scrambler_initialize(void);
 
