@@ -160,9 +160,9 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
     i_debug("[decrypt] scrambler failed with %d", (int) ret);
   } else {
     i_debug_hex("[decrypt] success. Plaintext", destination, source_size -
-                MAGIC_SIZE);
+                MAGIC_SIZE - crypto_box_SEALBYTES);
     /* We just decrypted that amount of bytes. */
-    ret = source_size - MAGIC_SIZE;
+    ret = source_size - MAGIC_SIZE - crypto_box_SEALBYTES;
   }
   sstream->chunk_index++;
   return ret;
