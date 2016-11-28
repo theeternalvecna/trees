@@ -200,6 +200,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
     result = scrambler_istream_read_decrypt_chunk(sstream, destination,
                                                   source, source_end - source);
     if (result < 0) {
+      i_debug("Here1");
       return result;
     }
   }
@@ -208,6 +209,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
     if (sstream->last_chunk_read) {
       stream->istream.stream_errno = stream->parent->stream_errno;
       stream->istream.eof = stream->parent->eof;
+      i_debug("Here2");
       return -1;
     } else {
       stream->istream.stream_errno = 0;
@@ -224,6 +226,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
                                                     source_end - source);
       if (result < 0) {
         stream->istream.stream_errno = EIO;
+        i_debug("Here3");
         return result;
       }
 
@@ -239,6 +242,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   if (result == 0) {
     stream->istream.stream_errno = stream->parent->stream_errno;
     stream->istream.eof = stream->parent->eof;
+    i_debug("Here4");
     return -1;
   }
 
