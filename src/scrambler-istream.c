@@ -194,46 +194,57 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
   while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
-      i_error("output buffer too small");
+      i_error("[scrambler] Decrypting to a destination too small. "
+              "Expected %u but remaining %u",
+              destination_end - destination,
+              source_end - source);
       sstream->istream.istream.stream_errno = EIO;
       sstream->istream.istream.eof = TRUE;
       return -1;
     }
 
+    /* Decrypt a chunk of our ENCRYPTED_CHUNK_SIZE as we know that we are
+     * expecting at least that amount. */
     result = scrambler_istream_read_decrypt_chunk(sstream, destination,
-                                                  source, source_end - source);
+                                                  source,
+                                                  ENCRYPTED_CHUNK_SIZE);
     if (result < 0) {
       return result;
     }
-    source += result;
+    /* Move the buffers forward with the amount of bytes we just decrypted.
+     * The destination buffer moves forward with how much we decrypted. */
+    source += ENCRYPTED_CHUNK_SIZE;
     destination += result;
-    source += MAGIC_SIZE;
   }
 
   if (stream->parent->eof) {
     if (sstream->last_chunk_read) {
       stream->istream.stream_errno = stream->parent->stream_errno;
       stream->istream.eof = stream->parent->eof;
-      i_debug("Here2");
       return -1;
     } else {
       stream->istream.stream_errno = 0;
       stream->istream.eof = FALSE;
 
       if (destination_end - destination < CHUNK_SIZE) {
-        i_error("output buffer too small (for final chunk)");
+        i_error("[scrambler] Decrypting to a destination too small. "
+                "Expected %u but remaining %u",
+                destination_end - destination,
+                source_end - source);
         sstream->istream.istream.stream_errno = EIO;
         sstream->istream.istream.eof = TRUE;
         return -1;
       }
 
-      result = scrambler_istream_read_decrypt_chunk(sstream, destination, source,
+      result = scrambler_istream_read_decrypt_chunk(sstream, destination,
+                                                    source,
                                                     source_end - source);
       if (result < 0) {
         stream->istream.stream_errno = EIO;
         return result;
       }
-      source += result;
+      /* Move source and destination forward. */
+      source += (source_end - source);
       destination += result;
 
       sstream->last_chunk_read = TRUE;
