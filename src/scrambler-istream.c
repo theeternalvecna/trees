@@ -152,8 +152,8 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
   i_debug_hex("pk", sstream->public_key, crypto_box_PUBLICKEYBYTES);
   i_debug_hex("sk", sstream->private_key, crypto_box_SECRETKEYBYTES);
   /* Note that we skip the header in the source for decryption. */
-  ssize_t ret = crypto_box_seal_open(destination, source + MAGIC_SIZE,
-                                     source_size - MAGIC_SIZE,
+  ssize_t ret = crypto_box_seal_open(destination, source,
+                                     source_size,
                                      sstream->public_key,
                                      sstream->private_key);
   if (ret != 0) {
@@ -162,7 +162,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
     i_debug_hex("[decrypt] success. Plaintext", destination, source_size -
                 MAGIC_SIZE - crypto_box_SEALBYTES);
     /* We just decrypted that amount of bytes. */
-    ret = source_size - MAGIC_SIZE - crypto_box_SEALBYTES;
+    ret = source_size - crypto_box_SEALBYTES;
   }
   sstream->chunk_index++;
   return ret;
@@ -189,7 +189,10 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   destination = stream->w_buffer + stream->pos;
   destination_end = stream->w_buffer + stream->buffer_size;
 
-  while ( (source_end - source) >= ENCRYPTED_CHUNK_SIZE ) {
+  /* Skip scrambler header. */
+  source += MAGIC_SIZE;
+
+  while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
       i_error("output buffer too small");
       sstream->istream.istream.stream_errno = EIO;
@@ -200,9 +203,10 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
     result = scrambler_istream_read_decrypt_chunk(sstream, destination,
                                                   source, source_end - source);
     if (result < 0) {
-      i_debug("Here1");
       return result;
     }
+    source += result;
+    destination += result;
   }
 
   if (stream->parent->eof) {
@@ -226,9 +230,10 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
                                                     source_end - source);
       if (result < 0) {
         stream->istream.stream_errno = EIO;
-        i_debug("Here3");
         return result;
       }
+      source += result;
+      destination += result;
 
       sstream->last_chunk_read = TRUE;
     }
