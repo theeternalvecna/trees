@@ -153,7 +153,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
   i_debug_hex("sk", sstream->private_key, crypto_box_SECRETKEYBYTES);
   /* Note that we skip the header in the source for decryption. */
   ssize_t ret = crypto_box_seal_open(destination, source + MAGIC_SIZE,
-                                     source_size - MAGIC_SIZE,
+                                     source_size + 1,
                                      sstream->public_key,
                                      sstream->private_key);
   if (ret > 0) {
