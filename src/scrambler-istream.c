@@ -156,11 +156,11 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
                                      source_size - MAGIC_SIZE,
                                      sstream->public_key,
                                      sstream->private_key);
-  if (ret > 0) {
+  if (ret != 0) {
+    i_debug("[decrypt] scrambler failed with %d", (int) ret);
+  } else {
     i_debug_hex("[decrypt] scrambler destination", destination,
                 ret);
-  } else {
-    i_debug("[decrypt] scrambler failed with %d", (int) ret);
   }
   sstream->chunk_index++;
   return ret;
