@@ -76,14 +76,18 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   i_debug_hex("chunk", chunk, chunk_size);
 #endif
 
+  memset(ciphertext, 0, sizeof(ciphertext));
   ret = crypto_box_seal(ciphertext, chunk, chunk_size,
                         sstream->public_key);
   if (ret < 0) {
     sstream->ostream.ostream.stream_errno = EACCES;
     return ret;
   }
-  i_debug("scrambler Sending ciphertext of size %lu bytes", ciphertext_len);
+  i_debug("[box seal] Sending ciphertext of size %lu bytes", ciphertext_len);
+  i_debug("[box seal] Chunk size was %lu bytes", chunk_size);
   i_debug_hex("[box seal]", ciphertext, ciphertext_len);
+  i_debug_hex("[box seal public key]", sstream->public_key,
+              sizeof(sstream->public_key));
   o_stream_send(sstream->ostream.parent, ciphertext, ciphertext_len);
 
 #ifdef DEBUG_STREAMS
