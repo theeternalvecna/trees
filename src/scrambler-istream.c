@@ -196,9 +196,6 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   destination = stream->w_buffer + stream->pos;
   destination_end = stream->w_buffer + stream->buffer_size;
 
-  /* Skip scrambler header. */
-  source += MAGIC_SIZE;
-
   while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
       i_error("[scrambler] Decrypting to a destination too small. "
