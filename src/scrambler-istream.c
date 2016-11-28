@@ -207,6 +207,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
     }
     source += result;
     destination += result;
+    source += MAGIC_SIZE;
   }
 
   if (stream->parent->eof) {
