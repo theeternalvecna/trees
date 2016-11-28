@@ -82,6 +82,8 @@ static ssize_t
 scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
                                     const unsigned char *source)
 {
+  ssize_t ret;
+
   /* Check for the scrambler header and if so we have an encrypted email that
    * we'll try to decrypt. */
   i_debug_hex("source header   ", source, sizeof(scrambler_header) + 10);
@@ -95,16 +97,21 @@ scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
       i_error("tried to decrypt a mail without the private key");
       sstream->istream.istream.stream_errno = EACCES;
       sstream->istream.istream.eof = TRUE;
-      return -1;
+      ret = -1;
+      goto end;
     }
+    ret = MAGIC_SIZE;
   } else {
 #ifdef DEBUG_STREAMS
     i_debug("istream read plain mail");
     i_debug_hex("chunk", source, 32);
 #endif
     sstream->mode = ISTREAM_MODE_PLAIN;
+    ret = 0;
   }
-  return 0;
+
+end:
+  return ret;
 }
 
 static ssize_t
@@ -195,7 +202,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
       i_error("[scrambler] Decrypting to a destination too small. "
-              "Expected %u but remaining %u",
+              "Expected %ld but remaining %ld",
               destination_end - destination,
               source_end - source);
       sstream->istream.istream.stream_errno = EIO;
@@ -228,7 +235,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
       if (destination_end - destination < CHUNK_SIZE) {
         i_error("[scrambler] Decrypting to a destination too small. "
-                "Expected %u but remaining %u",
+                "Expected %ld but remaining %ld",
                 destination_end - destination,
                 source_end - source);
         sstream->istream.istream.stream_errno = EIO;
