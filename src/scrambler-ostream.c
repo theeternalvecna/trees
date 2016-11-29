@@ -71,7 +71,7 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   unsigned char ciphertext[ciphertext_len];
 
 #ifdef DEBUG_STREAMS
-  i_debug_hex("chunk", chunk, chunk_size);
+  i_debug_hex("[scrambler] Plaintext", chunk, chunk_size);
 #endif
 
   sodium_memzero(ciphertext, sizeof(ciphertext));
@@ -164,7 +164,7 @@ scrambler_ostream_flush(struct ostream_private *stream)
   result = scrambler_ostream_send_chunk(sstream, sstream->chunk_buffer,
                                         sstream->chunk_buffer_size);
   if (result < 0) {
-    i_error("error sending last chunk on close");
+    i_error("[scrambler] Error sending last chunk on close");
     goto end;
   }
   sstream->chunk_buffer_size = 0;
