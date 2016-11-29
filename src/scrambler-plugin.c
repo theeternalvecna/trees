@@ -44,9 +44,6 @@
 #include "scrambler-ostream.h"
 #include "scrambler-istream.h"
 
-// After buffer grows larger than this, create a temporary file to /tmp where to read the mail.
-#define MAIL_MAX_MEMORY_BUFFER (1024 * 128)
-
 #define SCRAMBLER_CONTEXT(obj) \
   MODULE_CONTEXT(obj, scrambler_storage_module)
 #define SCRAMBLER_MAIL_CONTEXT(obj) \
@@ -57,22 +54,28 @@
 struct scrambler_user {
   /* Dovecot module context. */
   union mail_user_module_context module_ctx;
+
   /* Is this user has enabled this plugin? */
   unsigned int enabled : 1;
-  /* User keypair. */
-  unsigned char public_key[crypto_box_PUBLICKEYBYTES];
+
+  /* User public key. */
   unsigned int public_key_set : 1;
+  unsigned char public_key[crypto_box_PUBLICKEYBYTES];
+
   /* Indicate if the private key has been set. With inbound mail, the plugin
-   * doesn't have access to the private key thus being empy. */
+   * doesn't have access to the private key thus can be empty. */
   unsigned int private_key_set : 1;
   unsigned char private_key[crypto_box_SECRETKEYBYTES];
 };
 
 const char *scrambler_plugin_version = DOVECOT_ABI_VERSION;
 
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_storage_module, &mail_storage_module_register);
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_mail_module, &mail_module_register);
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_user_module, &mail_user_module_register);
+static MODULE_CONTEXT_DEFINE_INIT(scrambler_storage_module,
+                                  &mail_storage_module_register);
+static MODULE_CONTEXT_DEFINE_INIT(scrambler_mail_module,
+                                  &mail_module_register);
+static MODULE_CONTEXT_DEFINE_INIT(scrambler_user_module,
+                                  &mail_user_module_register);
 
 static const char *
 scrambler_get_string_setting(struct mail_user *user, const char *name)
@@ -273,7 +276,7 @@ scrambler_mail_user_created(struct mail_user *user)
     user->error = p_strdup_printf(user->pool,
                                   "Error getting private key for user %s.",
                                   user->username);
-    i_debug("Private key failed!");
+    i_debug("[scrambler] Getting private key failed");
     goto end;
   }
 
@@ -295,12 +298,12 @@ scrambler_mail_save_begin(struct mail_save_context *context,
   }
 
   if (!suser->enabled) {
-    i_debug("scrambler write plain mail");
+    i_debug("[scrambler] Plugin disabled for this user.");
     goto end;
   }
 
   if (!suser->public_key_set) {
-    i_debug("scrambler user public key unset. Skipping.");
+    i_debug("[scrambler] User public key not found. Skipping.");
     goto end;
   }
 
@@ -319,8 +322,8 @@ scrambler_mail_save_begin(struct mail_save_context *context,
     o_stream_unref(&context->data.output->real_stream->parent);
     context->data.output->real_stream->parent = output;
   }
-  i_debug("scrambler write encrypted mail with public key:");
-  i_debug_hex("KEY", suser->public_key, sizeof(suser->public_key));
+  i_debug("[scrambler] Writing encrypted mail with public key:");
+  i_debug_hex("[scrambler]", suser->public_key, sizeof(suser->public_key));
 
 end:
   return 0;
@@ -359,9 +362,7 @@ scrambler_istream_opened(struct mail *_mail, struct istream **stream)
                                      suser->private_key);
   i_stream_unref(&input);
 
-  int result = mmail->super.istream_opened(_mail, stream);
-
-  return result;
+  return mmail->super.istream_opened(_mail, stream);
 }
 
 static void

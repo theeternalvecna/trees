@@ -57,8 +57,6 @@ scrambler_ostream_send_header(struct scrambler_ostream *sstream)
 #ifdef DEBUG_STREAMS
   sstream->out_byte_count += sizeof(scrambler_header);
 #endif
-  i_debug("scrambler sending header %x %x %x (ret: %d)", scrambler_header[0],
-          scrambler_header[1], scrambler_header[2], (int) ret);
   return ret;
 }
 
@@ -76,7 +74,7 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   i_debug_hex("chunk", chunk, chunk_size);
 #endif
 
-  memset(ciphertext, 0, sizeof(ciphertext));
+  sodium_memzero(ciphertext, sizeof(ciphertext));
   ret = crypto_box_seal(ciphertext, chunk, chunk_size,
                         sstream->public_key);
   if (ret < 0) {
@@ -211,28 +209,26 @@ scrambler_ostream_create(struct ostream *output,
   struct scrambler_ostream *sstream = i_new(struct scrambler_ostream, 1);
   struct ostream *result;
 
-#ifdef DEBUG_STREAMS
-  i_debug("scrambler ostream create");
-#endif
-
   sstream->public_key = public_key;
 
   sstream->chunk_index = 0;
   sstream->chunk_buffer_size = 0;
-#ifdef DEBUG_STREAMS
-  sstream->in_byte_count = 0;
-  sstream->out_byte_count = 0;
-#endif
   sstream->flushed = 0;
 
   sstream->ostream.iostream.close = scrambler_ostream_close;
   sstream->ostream.sendv = scrambler_ostream_sendv;
   sstream->ostream.flush = scrambler_ostream_flush;
 
+#ifdef DEBUG_STREAMS
+  sstream->in_byte_count = 0;
+  sstream->out_byte_count = 0;
+  i_debug("[scrambler] ostream create");
+#endif
+
   result = o_stream_create(&sstream->ostream, output,
                            o_stream_get_fd(output));
   if (scrambler_ostream_send_header(sstream) < 0) {
-    i_error("error creating ostream");
+    i_error("[scrambler] Unable to create ostream");
     return NULL;
   }
 
