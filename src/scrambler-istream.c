@@ -372,9 +372,6 @@ scrambler_istream_close(struct iostream_private *stream, bool close_parent)
 {
   struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
 
-  /* Wipe private key material. */
-  sodium_memzero(sstream->private_key, crypto_box_SECRETKEYBYTES);
-
 #ifdef DEBUG_STREAMS
   i_debug("scrambler istream close - %u bytes in / %u bytes out / "
           "%u bytes overhead", sstream->in_byte_count,
