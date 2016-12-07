@@ -74,6 +74,10 @@ scrambler_istream_read_parent(struct scrambler_istream *sstream,
     }
   }
 
+  i_debug("[scrambler] Read parent. Min alloc size: %lu, "
+          "data size: %lu, MAX: %lu", minimal_alloc_size, size,
+          MAX(minimal_alloc_size, size));
+
   i_stream_alloc(stream, MAX(minimal_alloc_size, size));
   return size;
 }
