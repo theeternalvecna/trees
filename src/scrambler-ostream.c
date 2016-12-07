@@ -70,9 +70,9 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   size_t ciphertext_len = crypto_box_SEALBYTES + chunk_size;
   unsigned char ciphertext[ciphertext_len];
 
-#ifdef DEBUG_STREAMS
-  i_debug_hex("[scrambler] Plaintext", chunk, chunk_size);
-#endif
+//#ifdef DEBUG_STREAMS
+//  i_debug_hex("[scrambler] Plaintext", chunk, chunk_size);
+//#endif
 
   sodium_memzero(ciphertext, sizeof(ciphertext));
   ret = crypto_box_seal(ciphertext, chunk, chunk_size,

@@ -152,8 +152,8 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
   sstream->in_byte_count += source_size;
 #endif
   i_debug("[decrypt] Source size: %lu", source_size);
-  i_debug_hex("[decrypt] scrambler source (without header)", source + MAGIC_SIZE,
-              source_size - MAGIC_SIZE);
+  //i_debug_hex("[decrypt] scrambler source (without header)", source + MAGIC_SIZE,
+  //            source_size - MAGIC_SIZE);
   i_debug_hex("pk", sstream->public_key, crypto_box_PUBLICKEYBYTES);
   i_debug_hex("sk", sstream->private_key, crypto_box_SECRETKEYBYTES);
   /* Note that we skip the header in the source for decryption. */
@@ -164,8 +164,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
   if (ret != 0) {
     i_debug("[scrambler] Decrypt failed with %ld", ret);
   } else {
-    i_debug_hex("[scrambler] Decrypt success. Plaintext", destination,
-                source_size - crypto_box_SEALBYTES);
+    i_debug("[scrambler] Decrypt success. Plaintext");
     /* We just decrypted that amount of bytes. */
     ret = source_size - crypto_box_SEALBYTES;
   }
