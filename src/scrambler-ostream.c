@@ -36,7 +36,6 @@ struct scrambler_ostream {
 
   const unsigned char *public_key;
 
-  unsigned int chunk_index;
   unsigned char chunk_buffer[CHUNK_SIZE];
   unsigned int chunk_buffer_size;
 
@@ -92,7 +91,6 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   sstream->out_byte_count += ciphertext_len;
 #endif
 
-  sstream->chunk_index++;
   return ciphertext_len;
 }
 
@@ -211,7 +209,6 @@ scrambler_ostream_create(struct ostream *output,
 
   sstream->public_key = public_key;
 
-  sstream->chunk_index = 0;
   sstream->chunk_buffer_size = 0;
   sstream->flushed = 0;
 
