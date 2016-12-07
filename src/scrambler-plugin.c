@@ -44,9 +44,6 @@
 #include "scrambler-ostream.h"
 #include "scrambler-istream.h"
 
-// After buffer grows larger than this, create a temporary file to /tmp where to read the mail.
-#define MAIL_MAX_MEMORY_BUFFER (1024 * 128)
-
 #define SCRAMBLER_CONTEXT(obj) \
   MODULE_CONTEXT(obj, scrambler_storage_module)
 #define SCRAMBLER_MAIL_CONTEXT(obj) \
@@ -57,21 +54,28 @@
 struct scrambler_user {
   /* Dovecot module context. */
   union mail_user_module_context module_ctx;
+
   /* Is this user has enabled this plugin? */
   unsigned int enabled : 1;
-  /* User keypair. */
+
+  /* User public key. */
+  unsigned int public_key_set : 1;
   unsigned char public_key[crypto_box_PUBLICKEYBYTES];
+
   /* Indicate if the private key has been set. With inbound mail, the plugin
-   * doesn't have access to the private key thus being empy. */
+   * doesn't have access to the private key thus can be empty. */
   unsigned int private_key_set : 1;
   unsigned char private_key[crypto_box_SECRETKEYBYTES];
 };
 
 const char *scrambler_plugin_version = DOVECOT_ABI_VERSION;
 
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_storage_module, &mail_storage_module_register);
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_mail_module, &mail_module_register);
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_user_module, &mail_user_module_register);
+static MODULE_CONTEXT_DEFINE_INIT(scrambler_storage_module,
+                                  &mail_storage_module_register);
+static MODULE_CONTEXT_DEFINE_INIT(scrambler_mail_module,
+                                  &mail_module_register);
+static MODULE_CONTEXT_DEFINE_INIT(scrambler_user_module,
+                                  &mail_user_module_register);
 
 static const char *
 scrambler_get_string_setting(struct mail_user *user, const char *name)
@@ -114,6 +118,7 @@ scrambler_get_user_hexdata(struct mail_user *user, const char *param,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to convert %s for user %s.", param,
                                   user->username);
+    i_error("[scrambler] Failing to hex2bin for %s", param);
     goto error;
   }
 
@@ -158,23 +163,27 @@ scrambler_get_private_key(struct mail_user *user,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to find nonce value for user %s.",
                                   user->username);
+    i_error("[scrambler] Unable to get sk_nonce.");
     goto error;
   }
 
   /* Get the opslimit and memlimit. */
   opslimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_opslimit");
   if (opslimit == ULLONG_MAX) {
+    i_error("[scrambler] Bad pwhash_opslimit value.");
     goto error;
   }
   memlimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_memlimit");
   if (memlimit == ULLONG_MAX) {
+    i_error("[scrambler] Bad pwhash_memlimit value.");
     goto error;
   }
 
   /* Get the scrambler user salt. It's possible that it's not available. */
-  have_salt = !!scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
-                                           pw_salt, sizeof(pw_salt));
-  if (!have_salt || password == NULL) {
+  have_salt = scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
+                                         pw_salt, sizeof(pw_salt));
+  if (have_salt == -1) {
+    i_error("[scrambler] Unable to get the pwhash_salt.");
     goto end;
   }
 
@@ -187,16 +196,19 @@ scrambler_get_private_key(struct mail_user *user,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to derive private key for user %s.",
                                   user->username);
+    i_error("[scrambler] pwhash failed for %s", user->username);
     goto error;
   }
 
   if (scrambler_get_user_hexdata(user, "scrambler_locked_secretbox",
                                  secretbox, sizeof(secretbox))) {
+    i_error("[scrambler] Unable to get locked_secretbox");
     goto error;
   }
 
   if (crypto_secretbox_open_easy(suser->private_key, secretbox,
                                  sizeof(secretbox), sk_nonce, sk) < 0) {
+    i_error("[scrambler] Unable to open secretbox.");
     goto error;
   }
   /* Got the private key! */
@@ -235,11 +247,10 @@ scrambler_mail_user_created(struct mail_user *user)
   if (scrambler_get_user_hexdata(user, "scrambler_public_key",
                                  suser->public_key,
                                  sizeof(suser->public_key))) {
-    user->error = p_strdup_printf(user->pool,
-                                  "Unable to find public key for user %s.",
-                                  user->username);
+    i_error("[scrambler] Unable to find public_key");
     goto end;
   }
+  suser->public_key_set = 1;
 
   /* If there are no password available or missing the salt, we'll consider
    * that we don't have access to private key thus it could be an inbound
@@ -247,9 +258,6 @@ scrambler_mail_user_created(struct mail_user *user)
    * be set to 1. */
   suser->private_key_set = 0;
   if (scrambler_get_private_key(user, suser) < 0) {
-    user->error = p_strdup_printf(user->pool,
-                                  "Error getting private key for user %s.",
-                                  user->username);
     goto end;
   }
 
@@ -271,9 +279,13 @@ scrambler_mail_save_begin(struct mail_save_context *context,
   }
 
   if (!suser->enabled) {
-    i_debug("scrambler write plain mail");
     goto end;
+  }
 
+  if (!suser->public_key_set) {
+    /* No public key for a user that have the plugin enabled is not good. */
+    i_error("[scrambler] User public key not found. Skipping.");
+    goto end;
   }
 
   // TODO: find a better solution for this. this currently works, because
@@ -291,7 +303,6 @@ scrambler_mail_save_begin(struct mail_save_context *context,
     o_stream_unref(&context->data.output->real_stream->parent);
     context->data.output->real_stream->parent = output;
   }
-  i_debug("scrambler write encrypted mail");
 
 end:
   return 0;
@@ -325,14 +336,14 @@ scrambler_istream_opened(struct mail *_mail, struct istream **stream)
   struct istream *input;
 
   input = *stream;
-  assert(suser->private_key_set);
+  if (!suser->private_key_set) {
+    return -1;
+  }
   *stream = scrambler_istream_create(input, suser->public_key,
                                      suser->private_key);
   i_stream_unref(&input);
 
-  int result = mmail->super.istream_opened(_mail, stream);
-
-  return result;
+  return mmail->super.istream_opened(_mail, stream);
 }
 
 static void

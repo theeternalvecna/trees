@@ -25,6 +25,7 @@
 #include <sodium.h>
 
 #define MAGIC_SIZE (sizeof(scrambler_header))
+/* Aligns with the docevot default buffer size. */
 #define CHUNK_SIZE 8192
 #define ENCRYPTED_CHUNK_SIZE (crypto_box_SEALBYTES + CHUNK_SIZE)
 #define MAXIMAL_PASSWORD_LENGTH 256
@@ -40,7 +41,7 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
-extern const char scrambler_header[3];
+extern const unsigned char scrambler_header[3];
 
 int scrambler_initialize(void);
 

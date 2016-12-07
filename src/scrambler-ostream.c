@@ -36,7 +36,6 @@ struct scrambler_ostream {
 
   const unsigned char *public_key;
 
-  unsigned int chunk_index;
   unsigned char chunk_buffer[CHUNK_SIZE];
   unsigned int chunk_buffer_size;
 
@@ -70,13 +69,11 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   size_t ciphertext_len = crypto_box_SEALBYTES + chunk_size;
   unsigned char ciphertext[ciphertext_len];
 
-#ifdef DEBUG_STREAMS
-  i_debug_hex("chunk", chunk, chunk_size);
-#endif
-
-  ret = crypto_box_seal(ciphertext, chunk, ciphertext_len,
+  sodium_memzero(ciphertext, sizeof(ciphertext));
+  ret = crypto_box_seal(ciphertext, chunk, chunk_size,
                         sstream->public_key);
   if (ret < 0) {
+    sstream->ostream.ostream.stream_errno = EACCES;
     return ret;
   }
   o_stream_send(sstream->ostream.parent, ciphertext, ciphertext_len);
@@ -85,7 +82,8 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   sstream->out_byte_count += ciphertext_len;
 #endif
 
-  sstream->chunk_index++;
+  /* Return the size of the plaintext so dovecot gets the right size for the
+   * istream after decryption. */
   return chunk_size;
 }
 
@@ -138,7 +136,7 @@ scrambler_ostream_sendv(struct ostream_private *stream,
 
 #ifdef DEBUG_STREAMS
   sstream->in_byte_count += result;
-  i_debug("scrambler ostream send (%ld)", result);
+  i_debug("[scrambler] ostream send (%ld)", result);
 #endif
 
   return result;
@@ -157,7 +155,7 @@ scrambler_ostream_flush(struct ostream_private *stream)
   result = scrambler_ostream_send_chunk(sstream, sstream->chunk_buffer,
                                         sstream->chunk_buffer_size);
   if (result < 0) {
-    i_error("error sending last chunk on close");
+    i_error("[scrambler] Error sending last chunk on close");
     goto end;
   }
   sstream->chunk_buffer_size = 0;
@@ -170,11 +168,10 @@ scrambler_ostream_flush(struct ostream_private *stream)
   }
   sstream->flushed = 1;
 
-#ifdef DEBUG_STREAMS
-  i_debug("scrambler ostream flush (%d)", (int)result);
-#endif
-
 end:
+#ifdef DEBUG_STREAMS
+  i_debug("[scrambler] ostream flush (%ld)", result);
+#endif
   return result;
 }
 
@@ -185,7 +182,7 @@ scrambler_ostream_close(struct iostream_private *stream,
   struct scrambler_ostream *sstream = (struct scrambler_ostream *) stream;
 
 #ifdef DEBUG_STREAMS
-  i_debug("scrambler ostream close - %u bytes in / %u bytes out / "
+  i_debug("[scrambler] ostream close - %u bytes in / %u bytes out / "
           "%u bytes overhead", sstream->in_byte_count,
           sstream->out_byte_count,
           sstream->out_byte_count - sstream->in_byte_count);
@@ -203,28 +200,24 @@ scrambler_ostream_create(struct ostream *output,
   struct scrambler_ostream *sstream = i_new(struct scrambler_ostream, 1);
   struct ostream *result;
 
-#ifdef DEBUG_STREAMS
-  i_debug("scrambler ostream create");
-#endif
-
   sstream->public_key = public_key;
 
-  sstream->chunk_index = 0;
   sstream->chunk_buffer_size = 0;
-#ifdef DEBUG_STREAMS
-  sstream->in_byte_count = 0;
-  sstream->out_byte_count = 0;
-#endif
   sstream->flushed = 0;
 
   sstream->ostream.iostream.close = scrambler_ostream_close;
   sstream->ostream.sendv = scrambler_ostream_sendv;
   sstream->ostream.flush = scrambler_ostream_flush;
 
+#ifdef DEBUG_STREAMS
+  sstream->in_byte_count = 0;
+  sstream->out_byte_count = 0;
+#endif
+
   result = o_stream_create(&sstream->ostream, output,
                            o_stream_get_fd(output));
   if (scrambler_ostream_send_header(sstream) < 0) {
-    i_error("error creating ostream");
+    i_error("[scrambler] Unable to create ostream");
     return NULL;
   }
 

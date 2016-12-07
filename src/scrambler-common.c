@@ -32,7 +32,7 @@
 
 #include "scrambler-common.h"
 
-const char scrambler_header[] = { 0xee, 0xff, 0xcc };
+const unsigned char scrambler_header[] = { 0xee, 0xff, 0xcc };
 
 int
 scrambler_initialize(void)
@@ -74,6 +74,8 @@ scrambler_read_line_fd(pool_t pool, int fd)
   return result;
 }
 
+#ifdef DEBUG_STREAMS
+
 void
 i_debug_hex(const char *prefix, const unsigned char *data, size_t size)
 {
@@ -90,3 +92,16 @@ i_debug_hex(const char *prefix, const unsigned char *data, size_t size)
     i_debug("%s", str_c(output));
   } T_END;
 }
+
+#else /* DEBUG_STREAMS */
+
+void
+i_debug_hex(const char *prefix, const unsigned char *data, size_t size)
+{
+  (void) prefix;
+  (void) data;
+  (void) size;
+  return;
+}
+
+#endif /* DEBUG_STREAMS */

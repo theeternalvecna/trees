@@ -40,8 +40,7 @@ struct scrambler_istream {
   const unsigned char *public_key;
   unsigned char *private_key;
 
-  unsigned int chunk_index;
-  bool last_chunk_read;
+  unsigned int last_chunk_read : 1;
 
 #ifdef DEBUG_STREAMS
   unsigned int in_byte_count;
@@ -82,26 +81,28 @@ static ssize_t
 scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
                                     const unsigned char *source)
 {
+  ssize_t ret;
+
   /* Check for the scrambler header and if so we have an encrypted email that
    * we'll try to decrypt. */
-  if (memcmp(scrambler_header, source, sizeof(scrambler_header))) {
-#ifdef DEBUG_STREAMS
-    i_debug("istream read encrypted mail");
-#endif
+  if (!memcmp(scrambler_header, source, sizeof(scrambler_header))) {
     sstream->mode = ISTREAM_MODE_DECRYPT;
     if (sstream->private_key == NULL) {
-      i_error("tried to decrypt a mail without the private key");
+      i_error("[scrambler] No private key for decryption.");
       sstream->istream.istream.stream_errno = EACCES;
       sstream->istream.istream.eof = TRUE;
-      return -1;
+      ret = -1;
+      goto end;
     }
+    /* Returning size of header so we can skip it for decryption. */
+    ret = MAGIC_SIZE;
   } else {
-#ifdef DEBUG_STREAMS
-    i_debug("istream read plain mail");
-#endif
     sstream->mode = ISTREAM_MODE_PLAIN;
+    ret = 0;
   }
-  return 0;
+
+end:
+  return ret;
 }
 
 static ssize_t
@@ -124,11 +125,15 @@ scrambler_istream_read_detect(struct scrambler_istream *sstream)
   if (result < 0) {
     goto end;
   }
+
+  /* Skip the magic if any is detected. For plain email, the result is 0
+   * else the size of the header. */
+  i_stream_skip(stream->parent, result);
+
 #ifdef DEBUG_STREAMS
   sstream->in_byte_count += result;
 #endif
 
-  i_stream_skip(stream->parent, result);
 end:
   return result;
 }
@@ -136,10 +141,27 @@ end:
 static ssize_t
 scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
                                      unsigned char *destination,
-                                     const unsigned char *source)
+                                     const unsigned char *source,
+                                     size_t source_size)
 {
-  return crypto_box_seal_open(destination, source, ENCRYPTED_CHUNK_SIZE,
-                              sstream->public_key, sstream->private_key);
+#ifdef DEBUG_STREAMS
+  sstream->in_byte_count += source_size;
+  i_debug("[scrambler] Decrypt chunk source size: %lu", source_size);
+#endif
+
+  /* Note that we skip the header in the source for decryption. */
+  ssize_t ret = crypto_box_seal_open(destination, source,
+                                     source_size,
+                                     sstream->public_key,
+                                     sstream->private_key);
+  if (ret != 0) {
+    i_error("[scrambler] Box seal open failed with %ld", ret);
+    ret = -1;
+  } else {
+    /* We just decrypted that amount of bytes. */
+    ret = source_size - crypto_box_SEALBYTES;
+  }
+  return ret;
 }
 
 static ssize_t
@@ -163,19 +185,29 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   destination = stream->w_buffer + stream->pos;
   destination_end = stream->w_buffer + stream->buffer_size;
 
-  while ( (source_end - source) >= ENCRYPTED_CHUNK_SIZE ) {
+  while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
-      i_error("output buffer too small");
+      i_error("[scrambler] Decrypting to a destination too small. "
+              "Expected %ld but remaining %ld. Stopping.",
+              destination_end - destination,
+              source_end - source);
       sstream->istream.istream.stream_errno = EIO;
       sstream->istream.istream.eof = TRUE;
       return -1;
     }
 
+    /* Decrypt a chunk of our ENCRYPTED_CHUNK_SIZE as we know that we are
+     * expecting at least that amount. */
     result = scrambler_istream_read_decrypt_chunk(sstream, destination,
-                                                  source);
+                                                  source,
+                                                  ENCRYPTED_CHUNK_SIZE);
     if (result < 0) {
       return result;
     }
+    /* Move the buffers forward with the amount of bytes we just decrypted.
+     * The destination buffer moves forward with how much we decrypted. */
+    source += ENCRYPTED_CHUNK_SIZE;
+    destination += result;
   }
 
   if (stream->parent->eof) {
@@ -188,19 +220,27 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
       stream->istream.eof = FALSE;
 
       if (destination_end - destination < CHUNK_SIZE) {
-        i_error("output buffer too small (for final chunk)");
+        i_error("[scrambler] At EOF, decrypting to a destination too small. "
+                "Expected %ld but remaining %ld",
+                destination_end - destination,
+                source_end - source);
         sstream->istream.istream.stream_errno = EIO;
         sstream->istream.istream.eof = TRUE;
         return -1;
       }
 
-      result = scrambler_istream_read_decrypt_chunk(sstream, destination, source);
+      result = scrambler_istream_read_decrypt_chunk(sstream, destination,
+                                                    source,
+                                                    source_end - source);
       if (result < 0) {
         stream->istream.stream_errno = EIO;
         return result;
       }
+      /* Move source and destination forward. */
+      source += (source_end - source);
+      destination += result;
 
-      sstream->last_chunk_read = TRUE;
+      sstream->last_chunk_read = 1;
     }
   }
 
@@ -217,7 +257,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
 #ifdef DEBUG_STREAMS
   sstream->out_byte_count += result;
-  i_debug("scrambler istream read (%d)", (int)result);
+  i_debug("[scrambler] Read decrypt %ld bytes", result);
 #endif
 
   return result;
@@ -254,11 +294,18 @@ scrambler_istream_read_plain(struct scrambler_istream *sstream)
 static ssize_t
 scrambler_istream_read(struct istream_private *stream)
 {
+  int ret;
   struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
 
+  if (sstream->mode == ISTREAM_MODE_DETECT) {
+    ret = scrambler_istream_read_detect(sstream);
+    if (ret < 0) {
+      return ret;
+    }
+  }
+
+  /* We've now detected the mode, process it. */
   switch (sstream->mode) {
-  case ISTREAM_MODE_DETECT:
-    return scrambler_istream_read_detect(sstream);
   case ISTREAM_MODE_DECRYPT:
     return scrambler_istream_read_decrypt(sstream);
   case ISTREAM_MODE_PLAIN:
@@ -276,24 +323,23 @@ scrambler_istream_seek(struct istream_private *stream, uoff_t v_offset,
   struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
 
 #ifdef DEBUG_STREAMS
-  i_debug("scrambler istream seek %d / %d / %d",
+  i_debug("[scrambler] istream seek %d / %d / %d",
           (int)stream->istream.v_offset, (int)v_offset, (int)mark);
 #endif
 
   if (v_offset < stream->istream.v_offset) {
-    // seeking backwards - go back to beginning and seek forward from there.
+    /* Seeking backwards. Go back to beginning and seek forward. */
     sstream->mode = ISTREAM_MODE_DETECT;
 
-    sstream->chunk_index = 0;
     sstream->last_chunk_read = 0;
-#ifdef DEBUG_STREAMS
-    sstream->in_byte_count = 0;
-    sstream->out_byte_count = 0;
-#endif
 
     stream->parent_expected_offset = stream->parent_start_offset;
     stream->skip = stream->pos = 0;
     stream->istream.v_offset = 0;
+#ifdef DEBUG_STREAMS
+    sstream->in_byte_count = 0;
+    sstream->out_byte_count = 0;
+#endif
 
     i_stream_seek(stream->parent, 0);
   }
@@ -314,13 +360,10 @@ scrambler_istream_stat(struct istream_private *stream, bool exact)
 static void
 scrambler_istream_close(struct iostream_private *stream, bool close_parent)
 {
-  struct scrambler_istream *sstream = (struct scrambler_istream *)stream;
-
-  /* Wipe private key material. */
-  sodium_memzero(sstream->private_key, crypto_box_SECRETKEYBYTES);
+  struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
 
 #ifdef DEBUG_STREAMS
-  i_debug("scrambler istream close - %u bytes in / %u bytes out / "
+  i_debug("[scrambler] istream close - %u bytes in / %u bytes out / "
           "%u bytes overhead", sstream->in_byte_count,
           sstream->out_byte_count,
           sstream->in_byte_count - sstream->out_byte_count);
@@ -338,21 +381,12 @@ scrambler_istream_create(struct istream *input,
 {
   struct scrambler_istream *sstream = i_new(struct scrambler_istream, 1);
 
-#ifdef DEBUG_STREAMS
-  i_debug("scrambler istream create");
-#endif
-
   sstream->mode = ISTREAM_MODE_DETECT;
 
   sstream->public_key = public_key;
   sstream->private_key = private_key;
 
-  sstream->chunk_index = 0;
   sstream->last_chunk_read = 0;
-#ifdef DEBUG_STREAMS
-  sstream->in_byte_count = 0;
-  sstream->out_byte_count = 0;
-#endif
 
   sstream->istream.iostream.close = scrambler_istream_close;
   sstream->istream.max_buffer_size = input->real_stream->max_buffer_size;
@@ -363,6 +397,11 @@ scrambler_istream_create(struct istream *input,
   sstream->istream.istream.readable_fd = FALSE;
   sstream->istream.istream.blocking = input->blocking;
   sstream->istream.istream.seekable = input->seekable;
+
+#ifdef DEBUG_STREAMS
+  sstream->in_byte_count = 0;
+  sstream->out_byte_count = 0;
+#endif
 
   return i_stream_create(&sstream->istream, input, i_stream_get_fd(input));
 }
