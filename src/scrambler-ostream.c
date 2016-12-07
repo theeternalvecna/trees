@@ -91,7 +91,8 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
   sstream->out_byte_count += ciphertext_len;
 #endif
 
-  return ciphertext_len;
+  //return ciphertext_len;
+  return chunk_size;
 }
 
 static ssize_t
