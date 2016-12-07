@@ -25,7 +25,8 @@
 #include <sodium.h>
 
 #define MAGIC_SIZE (sizeof(scrambler_header))
-#define CHUNK_SIZE 8192
+//#define CHUNK_SIZE 8192
+#define CHUNK_SIZE 1000000
 #define ENCRYPTED_CHUNK_SIZE (crypto_box_SEALBYTES + CHUNK_SIZE)
 #define MAXIMAL_PASSWORD_LENGTH 256
 #define MAX_ISTREAM_BUFFER_SIZE (ENCRYPTED_CHUNK_SIZE * 2)
