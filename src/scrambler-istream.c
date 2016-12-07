@@ -198,6 +198,8 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
   i_debug("[scrambler] Source size: %lu, Destination size: %lu",
           source_end - source, destination_end - destination);
+  i_debug("[scrambler] Stream pos: %lu", stream->pos);
+  i_debug("[scrambler] Buffer size: %lu", stream->buffer_size);
 
   while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
