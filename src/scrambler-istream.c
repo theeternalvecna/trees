@@ -168,8 +168,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
     i_debug("[scrambler] Decrypt failed with %ld", ret);
   } else {
     /* We just decrypted that amount of bytes. */
-    //ret = source_size - crypto_box_SEALBYTES;
-    ret = source_size;
+    ret = source_size - crypto_box_SEALBYTES;
     i_debug("[scrambler] Decrypt success %lu bytes.", ret);
   }
   return ret;
