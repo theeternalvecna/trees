@@ -40,7 +40,6 @@ struct scrambler_istream {
   const unsigned char *public_key;
   unsigned char *private_key;
 
-  uint32_t chunk_index;
   unsigned int last_chunk_read : 1;
 
 #ifdef DEBUG_STREAMS
@@ -168,11 +167,10 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
   if (ret != 0) {
     i_debug("[scrambler] Decrypt failed with %ld", ret);
   } else {
-    i_debug("[scrambler] Decrypt success. Plaintext");
     /* We just decrypted that amount of bytes. */
     ret = source_size - crypto_box_SEALBYTES;
+    i_debug("[scrambler] Decrypt success %lu bytes.", ret);
   }
-  sstream->chunk_index++;
   return ret;
 }
 
@@ -196,6 +194,9 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   source_end = source + source_size;
   destination = stream->w_buffer + stream->pos;
   destination_end = stream->w_buffer + stream->buffer_size;
+
+  i_debug("[scrambler] Source size: %lu, Destination size: %lu",
+          source_end - source, destination_end - destination);
 
   while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
@@ -345,7 +346,6 @@ scrambler_istream_seek(struct istream_private *stream, uoff_t v_offset,
     /* Seeking backwards. Go back to beginning and seek forward. */
     sstream->mode = ISTREAM_MODE_DETECT;
 
-    sstream->chunk_index = 0;
     sstream->last_chunk_read = 0;
 
     stream->parent_expected_offset = stream->parent_start_offset;
@@ -401,7 +401,6 @@ scrambler_istream_create(struct istream *input,
   sstream->public_key = public_key;
   sstream->private_key = private_key;
 
-  sstream->chunk_index = 0;
   sstream->last_chunk_read = 0;
 
   sstream->istream.iostream.close = scrambler_istream_close;
