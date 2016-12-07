@@ -260,6 +260,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
   result = (destination - stream->w_buffer) - stream->pos;
   stream->pos = destination - stream->w_buffer;
+  i_debug("[scrambler] Stream pos: %lu", stream->pos);
 
   if (result == 0) {
     stream->istream.stream_errno = stream->parent->stream_errno;
