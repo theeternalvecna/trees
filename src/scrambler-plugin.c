@@ -56,7 +56,7 @@ struct scrambler_user {
   union mail_user_module_context module_ctx;
 
   /* Is this user has enabled this plugin? */
-  int enabled : 1;
+  int enabled;
 
   /* User public key. */
   unsigned int public_key_set : 1;
