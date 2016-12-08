@@ -23,7 +23,6 @@
 #define SCRAMBLER_OSTREAM_H
 
 #include <dovecot/ostream.h>
-#include <openssl/evp.h>
 
 struct ostream *scrambler_ostream_create(struct ostream *parent_ostream,
                                          const unsigned char *public_key);

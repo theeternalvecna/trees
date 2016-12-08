@@ -23,7 +23,6 @@
 #define SCRAMBLER_ISTREAM_H
 
 #include <dovecot/istream.h>
-#include <openssl/evp.h>
 
 struct istream *scrambler_istream_create(struct istream *input,
                                          const unsigned char *public_key,
