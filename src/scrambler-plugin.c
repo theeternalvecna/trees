@@ -235,7 +235,7 @@ scrambler_mail_user_created(struct mail_user *user)
 
   /* Does this user should use the scrambler or not? */
   suser->enabled = scrambler_get_integer_setting(user, "scrambler_enabled");
-  if (suser->enabled == -1) {
+  if (suser->enabled == -1 || suser->enabled == 0) {
     /* Not present means disabled. Stop right now because we won't use
      * anything of this plugin for the user. */
     suser->enabled = 0;
