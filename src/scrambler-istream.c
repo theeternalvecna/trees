@@ -83,6 +83,14 @@ scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
 {
   ssize_t ret;
 
+  if (sstream->private_key == NULL) {
+    i_error("[scrambler] Trying to decrypt without private key.");
+    sstream->istream.istream.stream_errno = EACCES;
+    sstream->istream.istream.eof = TRUE;
+    ret = -1;
+    goto end;
+  }
+
   /* Check for the scrambler header and if so we have an encrypted email that
    * we'll try to decrypt. */
   if (!memcmp(scrambler_header, source, sizeof(scrambler_header))) {
