@@ -336,9 +336,6 @@ scrambler_istream_opened(struct mail *_mail, struct istream **stream)
   struct istream *input;
 
   input = *stream;
-  if (!suser->private_key_set) {
-    return -1;
-  }
   *stream = scrambler_istream_create(input, suser->public_key,
                                      suser->private_key);
   i_stream_unref(&input);

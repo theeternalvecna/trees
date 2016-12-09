@@ -202,6 +202,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
                                                   source,
                                                   ENCRYPTED_CHUNK_SIZE);
     if (result < 0) {
+      stream->istream.stream_errno = EIO;
       return result;
     }
     /* Move the buffers forward with the amount of bytes we just decrypted.
