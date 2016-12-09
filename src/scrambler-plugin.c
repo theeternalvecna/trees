@@ -329,6 +329,7 @@ scrambler_mailbox_allocated(struct mailbox *box)
 static int
 scrambler_istream_opened(struct mail *_mail, struct istream **stream)
 {
+  unsigned char *private_key = NULL;
   struct mail_private *mail = (struct mail_private *)_mail;
   struct mail_user *user = _mail->box->storage->user;
   struct scrambler_user *suser = SCRAMBLER_USER_CONTEXT(user);
@@ -336,8 +337,11 @@ scrambler_istream_opened(struct mail *_mail, struct istream **stream)
   struct istream *input;
 
   input = *stream;
+  if (suser->private_key_set) {
+    private_key = suser->private_key;
+  }
   *stream = scrambler_istream_create(input, suser->public_key,
-                                     suser->private_key);
+                                     private_key);
   i_stream_unref(&input);
 
   return mmail->super.istream_opened(_mail, stream);
