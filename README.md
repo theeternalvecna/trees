@@ -35,18 +35,25 @@ Requirements
 
 * libsodium authentication plugin for dovecot: not required, but there is
   little benefit from hashing passwords using argon2 if dovecot authentication
-  relies on a weaker digest algorithm https://github.com/LuckyFellow/dovecot-
-  libsodium-plugin.git
+  relies on a weaker digest algorithm.
+  https://github.com/LuckyFellow/dovecot-libsodium-plugin.git
 
 Installation
 -------------------------------------
 
 * Use `make dovecot-install` to download and build dovecot 2.2.21 in a sub-
-  directory. It's a local installation and your system wont be affected.
+  directory. It's a local installation and your system won't be affected.
 
 * Type `make all` to compile the plugin.
 
 * Find the plugin at `dovecot/target/lib/dovecot/lib18_scrambler_plugin.so`.
+
+* Copy to `/usr/lib/dovecot/modules/`
+
+* Enable the plugin. For example, add `mail_plugins = expire quota scrambler`
+  to `/etc/dovecot/conf.d/10-mail.conf`
+
+See below for how to configure the plugin.
 
 Tests
 -------------------------------------
@@ -65,19 +72,19 @@ dovecot environment).
 
 * `scrambler_enabled` Can be either the integer `1` or `0`.
 
-* `scrambler_public_key` The public key of the user (hex string).
+* `scrambler_public_key` The public Curve25519 key of the user (hex string).
 
-* `scrambler_locked_secretbox` contains the private key of a user which is
-  locked by the user password (hex string).
+* `scrambler_locked_secretbox` contains the Curve25519 private key of a user
+  which is locked using the argon2 digest of the user's password (hex string).
 
-* `scrambler_sk_nonce` used to decrypt the lockedbox (hex string).
+* `scrambler_sk_nonce` 24 byte random nonce for locked_secretbox (hex string).
 
 * `scrambler_pwhash_opslimit` argon2 CPU usage parameter (3..10 int).
 
 * `scrambler_pwhash_memlimit` argon2 memory usage parameter (must be in range
   8192 bytes to 4 TB, expressed in bytes).
 
-* `scrambler_pwhash_salt` used to hash the plain password (hex string).
+* `scrambler_pwhash_salt` 16 byte random argon2 salt (hex string).
 
 An example database scheme for this might be:
 
