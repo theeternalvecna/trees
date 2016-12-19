@@ -1,0 +1,205 @@
+#!/usr/bin/env ruby
+
+#
+# This is a simple command line script to create a set of values expected
+# by tofu_scrambler. Useful for testing.
+#
+# NOTE: this requires rbnacl-4.0.0.pre.gem or newer, or Riseup's fork of rbnacl:
+#
+# gem install specific_install
+# gem specific_install https://0xacab.org/riseup/rbnacl
+# gem install rbnacl-libsodium
+#
+# The gem rbnacl-libsodium is just a copy of libsodium that will built and
+# install the latest libsodium in ruby's LD_LIBRARY_PATH. This is useful,
+# because the packaged versions for debian stable and ubuntu are too old to
+# support argon2.
+#
+
+begin
+  require 'rbnacl/libsodium'
+  require 'rbnacl'
+rescue LoadError
+  puts "the gems rbnacl and rbnacl-libsodium are required"
+  exit 1
+end
+
+def usage
+  puts "USAGE:"
+  puts "   tofu-create --password PASSWORD [OPTIONS]"
+  puts
+  puts "OPTIONS may include:"
+  puts "   --opslimit OPSLIMIT -- argon2 ops limit, integer in 3..10, or one of"
+  puts "                          'interactive', 'moderate', 'sensitive'"
+  puts "   --memlimit MEMLIMIT -- argon2 memory limit, in bytes, or one of"
+  puts "                          'interactive', 'moderate', 'sensitive'"
+  puts "   --salt SALT         -- hex encoded salt for password digest,"
+  puts "                          #{StorageKey::SALT_BYTES} bytes in length"
+  puts "   --nonce NONCE       -- hex encoded nonce for secretbox encryption of"
+  puts "                          private key, #{StorageKey::NONCE_BYTES} bytes in length"
+  exit 1
+end
+
+def main
+  password = nil
+  st = StorageKey.new
+
+  while ARGV.any?
+    case ARGV.first
+    when "--password"
+      ARGV.shift
+      password = ARGV.shift
+    when "--opslimit"
+      ARGV.shift
+      st.pwhash_opslimit = opslimit(ARGV.shift)
+    when "--memlimit"
+      ARGV.shift
+      st.pwhash_memlimit = memlimit(ARGV.shift)
+    when "--salt"
+      ARGV.shift
+      st.pwhash_salt = ARGV.shift
+    when "--nonce"
+      ARGV.shift
+      st.sk_nonce = ARGV.shift
+    else
+      usage
+    end
+  end
+  usage unless password
+  st.generate_new_keypair(password)
+  puts st.to_s
+end
+
+def opslimit(arg)
+  if arg.nil?
+    usage
+  elsif arg =~ /[0-9]+/
+    arg.to_i
+  else
+    RbNaCl::PasswordHash::Argon2.opslimit_value(arg.to_sym)
+  end
+end
+
+def memlimit(arg)
+  if arg.nil?
+    usage
+  elsif arg =~ /[0-9]+/
+    arg.to_i
+  else
+    RbNaCl::PasswordHash::Argon2.memlimit_value(arg.to_sym)
+  end
+end
+
+class StorageKey
+  DEFAULT_OPSLIMIT = RbNaCl::PasswordHash::Argon2.opslimit_value(:interactive)
+  DEFAULT_MEMLIMIT = RbNaCl::PasswordHash::Argon2.memlimit_value(:interactive)
+  SALT_BYTES   = RbNaCl::PasswordHash::Argon2::SALTBYTES
+  NONCE_BYTES  = RbNaCl::SecretBox::NONCEBYTES
+  DIGEST_BYTES = RbNaCl::SecretBox::KEYBYTES
+
+  attr_accessor :public_key  # text (hex encoded)
+                             # an ed25519 public key, hex encoded.
+
+  attr_accessor :locked_secretbox # text (hex encoded)
+                                  # an encrypted Curve25519 private key, hex
+                                  # encoded. encrypted using the digest of user's
+                                  # password.
+
+  attr_accessor :sk_nonce # string (hex encoded)
+                          # a random nonce used for creating
+                          # locked_secretbox
+
+  attr_accessor :pwhash_opslimit # int, in range 3-10
+  attr_accessor :pwhash_memlimit # int, bytes
+  attr_accessor :pwhash_salt     # string (hex encoded)
+
+  def generate_new_keypair(password)
+    key = self.new_key()
+    self.encrypt_key(
+      key: key,
+      password: password
+    )
+  end
+
+  def to_s
+    attrs = [:public_key, :locked_secretbox, :sk_nonce, :pwhash_opslimit,
+             :pwhash_memlimit, :pwhash_salt]
+    "{\n" + attrs.map{|attr| %(  "#{attr}": "#{self.send(attr)}")}.join(",\n") + "\n}\n"
+  end
+
+  protected
+
+  #
+  # given a private key and a password, this will encrypt the key using
+  # the password and save all the necessary values into self.
+  #
+  def encrypt_key(key:, password: nil)
+    unless key.is_a?(RbNaCl::PrivateKey)
+      raise ArgumentError, "key must be an RbNaCl::PrivateKey"
+    end
+    if password.nil? || password.empty?
+      raise ArgumentError, "password is required to encrypt the key"
+    end
+
+    # use KDF to generate a symmetric key from password
+    symmetric_key = password_kdf(password)
+
+    # encrypt the key
+    self.sk_nonce ||= bin2hex(RbNaCl::Random.random_bytes(NONCE_BYTES))
+    secret_box    = RbNaCl::SecretBox.new(symmetric_key)
+    encrypted_key = secret_box.encrypt(hex2bin(self.sk_nonce), key.to_bytes)
+
+    # save the key
+    self.public_key = bin2hex(key.public_key.to_bytes)
+    self.locked_secretbox = bin2hex(encrypted_key)
+  end
+
+  #
+  # reverses encrypt_key, returning RbNaCl::PrivateKey
+  #
+  def decrypt_key(password)
+    secret_box = RbNaCl::SecretBox.new(password_kdf(password))
+    return RbNaCl::PrivateKey.new(
+      secret_box.decrypt(
+        hex2bin(self.sk_nonce),
+        hex2bin(self.locked_secretbox)
+      )
+    )
+  rescue RbNaCl::CryptoError
+    raise ArgumentError, 'wrong password'
+  end
+
+  #
+  # generates a new Curve25519 private key
+  #
+  def new_key
+    return RbNaCl::PrivateKey.generate
+  end
+
+  #
+  # argon2 KDF
+  #
+  def password_kdf(secret)
+    self.pwhash_opslimit ||= DEFAULT_OPSLIMIT
+    self.pwhash_memlimit ||= DEFAULT_MEMLIMIT
+    self.pwhash_salt ||= bin2hex(RbNaCl::Random.random_bytes(SALT_BYTES))
+
+    RbNaCl::PasswordHash.argon2(
+      secret,
+      hex2bin(self.pwhash_salt),
+      self.pwhash_opslimit,
+      self.pwhash_memlimit,
+      DIGEST_BYTES
+    )
+  end
+
+  def hex2bin(hex)
+    [hex].pack('H*')
+  end
+
+  def bin2hex(binary)
+    binary.unpack('H*').first
+  end
+end
+
+main()
