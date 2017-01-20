@@ -19,6 +19,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h>
+
 #include <dovecot/lib.h>
 #include <dovecot/istream.h>
 #include <dovecot/istream-private.h>
@@ -36,6 +38,8 @@ struct scrambler_istream {
   struct istream_private istream;
 
   enum scrambler_istream_mode mode;
+
+  uint32_t version;
 
   const unsigned char *public_key;
   unsigned char *private_key;
@@ -78,14 +82,20 @@ scrambler_istream_read_parent(struct scrambler_istream *sstream,
 }
 
 static ssize_t
-scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
+scrambler_istream_read_detect_header(struct scrambler_istream *sstream,
                                     const unsigned char *source)
 {
   ssize_t ret;
 
   /* Check for the scrambler header and if so we have an encrypted email that
    * we'll try to decrypt. */
-  if (!memcmp(scrambler_header, source, sizeof(scrambler_header))) {
+  if (!memcmp(scrambler_header, source, MAGIC_SIZE)) {
+    /* Yay we have an encrypted mail! Let's get the version of the plugin it
+     * was encrypted for. */
+    uint32_t version_to_network;
+    memcpy(&version_to_network, source + MAGIC_SIZE,
+           sizeof(version_to_network));
+    sstream->version = ntohl(version_to_network);
     sstream->mode = ISTREAM_MODE_DECRYPT;
     if (sstream->private_key == NULL) {
       i_error("[scrambler] No private key for decryption.");
@@ -95,7 +105,7 @@ scrambler_istream_read_detect_magic(struct scrambler_istream *sstream,
       goto end;
     }
     /* Returning size of header so we can skip it for decryption. */
-    ret = MAGIC_SIZE;
+    ret = HEADER_SIZE;
   } else {
     sstream->mode = ISTREAM_MODE_PLAIN;
     ret = 0;
@@ -121,7 +131,7 @@ scrambler_istream_read_detect(struct scrambler_istream *sstream)
     goto end;
   }
   source = i_stream_get_data(stream->parent, &source_size);
-  result = scrambler_istream_read_detect_magic(sstream, source);
+  result = scrambler_istream_read_detect_header(sstream, source);
   if (result < 0) {
     goto end;
   }

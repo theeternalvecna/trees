@@ -57,6 +57,8 @@ struct scrambler_user {
 
   /* Is this user has enabled this plugin? */
   int enabled;
+  /* Version */
+  uint32_t version;
 
   /* User public key. */
   unsigned int public_key_set : 1;
@@ -224,6 +226,7 @@ error:
 static void
 scrambler_mail_user_created(struct mail_user *user)
 {
+  int version;
   struct mail_user_vfuncs *v = user->vlast;
   struct scrambler_user *suser;
 
@@ -241,6 +244,14 @@ scrambler_mail_user_created(struct mail_user *user)
     suser->enabled = 0;
     goto end;
   }
+
+  /* Get plugin version that the user is configured for. */
+  version = scrambler_get_integer_setting(user, "scrambler_version");
+  if (version < MIN_VERSION || version > MAX_VERSION) {
+    i_error("[scrambler] Bad version value.");
+    goto end;
+  }
+  suser->version = (uint32_t) version;
 
   /* Getting user public key. Without it, we can't do much so error if we
    * can't find it. */
@@ -294,12 +305,12 @@ scrambler_mail_save_begin(struct mail_save_context *context,
   // beginning (the usual way).
   if (context->data.output->real_stream->parent == NULL) {
     output = scrambler_ostream_create(context->data.output,
-                                      suser->public_key);
+                                      suser->public_key, suser->version);
     o_stream_unref(&context->data.output);
     context->data.output = output;
   } else {
     output = scrambler_ostream_create(context->data.output->real_stream->parent,
-                                      suser->public_key);
+                                      suser->public_key, suser->version);
     o_stream_unref(&context->data.output->real_stream->parent);
     context->data.output->real_stream->parent = output;
   }

@@ -24,7 +24,15 @@
 
 #include <sodium.h>
 
+#define VERSION_ONE 1
+/* Earliest and latest version this plugin supports. */
+#define MIN_VERSION VERSION_ONE
+#define MAX_VERSION VERSION_ONE
+
 #define MAGIC_SIZE (sizeof(scrambler_header))
+#define VERSION_SIZE (sizeof(uint32_t))
+#define HEADER_SIZE (MAGIC_SIZE + VERSION_SIZE)
+
 /* Aligns with the docevot default buffer size. */
 #define CHUNK_SIZE 8192
 #define ENCRYPTED_CHUNK_SIZE (crypto_box_SEALBYTES + CHUNK_SIZE)

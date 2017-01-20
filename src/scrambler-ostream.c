@@ -20,6 +20,8 @@
  */
 
 #include <assert.h>
+#include <arpa/inet.h>
+#include <string.h>
 
 #include <dovecot/lib.h>
 #include <dovecot/ostream.h>
@@ -34,6 +36,7 @@
 struct scrambler_ostream {
   struct ostream_private ostream;
 
+  uint32_t version;
   const unsigned char *public_key;
 
   unsigned char chunk_buffer[CHUNK_SIZE];
@@ -50,6 +53,15 @@ struct scrambler_ostream {
 static ssize_t
 scrambler_ostream_send_header(struct scrambler_ostream *sstream)
 {
+  char header[HEADER_SIZE];
+  uint32_t version_to_host;
+
+  /* First set the header magic number. */
+  memcpy(header, scrambler_header, MAGIC_SIZE);
+  /* Then, put in the version. */
+  version_to_host = htonl(sstream->version);
+  memcpy(header + MAGIC_SIZE, &version_to_host, VERSION_SIZE);
+
   /* The header here consists of a magic number. */
   ssize_t ret = o_stream_send(sstream->ostream.parent, scrambler_header,
                               sizeof(scrambler_header));
@@ -195,12 +207,14 @@ scrambler_ostream_close(struct iostream_private *stream,
 
 struct ostream *
 scrambler_ostream_create(struct ostream *output,
-                         const unsigned char *public_key)
+                         const unsigned char *public_key,
+                         uint32_t version)
 {
   struct scrambler_ostream *sstream = i_new(struct scrambler_ostream, 1);
   struct ostream *result;
 
   sstream->public_key = public_key;
+  sstream->version = version;
 
   sstream->chunk_buffer_size = 0;
   sstream->flushed = 0;

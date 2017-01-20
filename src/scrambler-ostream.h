@@ -25,6 +25,7 @@
 #include <dovecot/ostream.h>
 
 struct ostream *scrambler_ostream_create(struct ostream *parent_ostream,
-                                         const unsigned char *public_key);
+                                         const unsigned char *public_key,
+                                         uint32_t version);
 
 #endif /* SCRAMBLER_OSTREAM_H */
