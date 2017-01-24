@@ -63,10 +63,10 @@ scrambler_ostream_send_header(struct scrambler_ostream *sstream)
   memcpy(header + MAGIC_SIZE, &version_to_host, VERSION_SIZE);
 
   /* The header here consists of a magic number. */
-  ssize_t ret = o_stream_send(sstream->ostream.parent, scrambler_header,
-                              sizeof(scrambler_header));
+  ssize_t ret = o_stream_send(sstream->ostream.parent, header,
+                              sizeof(header));
 #ifdef DEBUG_STREAMS
-  sstream->out_byte_count += sizeof(scrambler_header);
+  sstream->out_byte_count += sizeof(header);
 #endif
   return ret;
 }
