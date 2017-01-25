@@ -20,6 +20,7 @@
  */
 
 #include <arpa/inet.h>
+#include <inttypes.h>
 
 #include <dovecot/lib.h>
 #include <dovecot/istream.h>
@@ -99,6 +100,15 @@ scrambler_istream_read_detect_header(struct scrambler_istream *sstream,
     sstream->mode = ISTREAM_MODE_DECRYPT;
     if (sstream->private_key == NULL) {
       i_error("[scrambler] No private key for decryption.");
+      sstream->istream.istream.stream_errno = EACCES;
+      sstream->istream.istream.eof = TRUE;
+      ret = -1;
+      goto end;
+    }
+    if (sstream->version < MIN_VERSION ||
+        sstream->version > MAX_VERSION) {
+      i_error("[scrambler] Unknown version %" PRIu32 ". Supporting %d to %d",
+              sstream->version, MIN_VERSION, MAX_VERSION);
       sstream->istream.istream.stream_errno = EACCES;
       sstream->istream.istream.eof = TRUE;
       ret = -1;
