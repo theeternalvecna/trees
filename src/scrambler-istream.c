@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2014-2015 The scrambler-plugin authors. All rights reserved.
+ * Copyright (c) 2014-2015 - The scrambler-plugin authors.
+ *                    2017 - David Goulet <dgoulet@riseup.net>
  *
  * On 30.4.2015 - or earlier on notice - the scrambler-plugin authors will
  * make this source code available under the terms of the GNU Affero General
