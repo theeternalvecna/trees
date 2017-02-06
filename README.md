@@ -46,7 +46,7 @@ Installation
 
 * Type `make all` to compile the plugin.
 
-* Find the plugin at `dovecot/target/lib/dovecot/lib18_scrambler_plugin.so`.
+* Find the plugin at `src/.libs/lib18_scrambler_plugin.so`.
 
 * Copy to `/usr/lib/dovecot/modules/`
 
@@ -54,12 +54,6 @@ Installation
   to `/etc/dovecot/conf.d/10-mail.conf`
 
 See below for how to configure the plugin.
-
-Tests
--------------------------------------
-
-* Install the gem requirements with `bundle install`.
-* Run tests with `bundle exec make spec-all`
 
 Database
 -------------------------------------
