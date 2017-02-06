@@ -19,6 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
 
@@ -138,6 +139,8 @@ scrambler_istream_read_detect(struct scrambler_istream *sstream)
 
   result = scrambler_istream_read_parent(sstream, MAGIC_SIZE, 0);
   if (result <= 0) {
+    /* Make sure we return an error here. */
+    result = -1;
     goto end;
   }
   source = i_stream_get_data(stream->parent, &source_size);
@@ -331,6 +334,9 @@ scrambler_istream_read(struct istream_private *stream)
     return scrambler_istream_read_decrypt(sstream);
   case ISTREAM_MODE_PLAIN:
     return scrambler_istream_read_plain(sstream);
+  case ISTREAM_MODE_DETECT:
+    /* Something went terribly wrong. */
+    assert(0);
   default:
     /* Should not happened in theory! */
     return -1;
