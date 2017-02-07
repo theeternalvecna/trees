@@ -41,10 +41,9 @@ Requirements
 Installation
 -------------------------------------
 
-* Use `make dovecot-install` to download and build dovecot 2.2.21 in a sub-
-  directory. It's a local installation and your system won't be affected.
+* Run `autogen.sh` and then `./configure`.
 
-* Type `make all` to compile the plugin.
+* Type `make` to compile the plugin.
 
 * Find the plugin at `src/.libs/lib18_scrambler_plugin.so`.
 
