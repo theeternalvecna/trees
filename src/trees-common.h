@@ -20,8 +20,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SCRAMBLER_COMMON_H
-#define SCRAMBLER_COMMON_H
+#ifndef TREES_COMMON_H
+#define TREES_COMMON_H
 
 #include <sodium.h>
 
@@ -30,7 +30,7 @@
 #define MIN_VERSION VERSION_ONE
 #define MAX_VERSION VERSION_ONE
 
-#define MAGIC_SIZE (sizeof(scrambler_header))
+#define MAGIC_SIZE (sizeof(trees_header))
 #define VERSION_SIZE (sizeof(uint32_t))
 #define HEADER_SIZE (MAGIC_SIZE + VERSION_SIZE)
 
@@ -50,12 +50,12 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
-extern const unsigned char scrambler_header[3];
+extern const unsigned char trees_header[3];
 
-int scrambler_initialize(void);
+int trees_initialize(void);
 
-const char *scrambler_read_line_fd(pool_t pool, int file_descriptor);
+const char *trees_read_line_fd(pool_t pool, int file_descriptor);
 
 void i_debug_hex(const char *prefix, const unsigned char *data, size_t size);
 
-#endif /* SCRAMBLER_COMMON_H */
+#endif /* TREES_COMMON_H */

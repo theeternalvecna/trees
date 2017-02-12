@@ -20,10 +20,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SCRAMBLER_PLUGIN_H
-#define SCRAMBLER_PLUGIN_H
+#ifndef TREES_OSTREAM_H
+#define TREES_OSTREAM_H
 
-void scrambler_plugin_init(struct module *module);
-void scrambler_plugin_deinit(void);
+#include <dovecot/ostream.h>
 
-#endif /* SCRAMBLER_PLUGIN_H */
+struct ostream *trees_ostream_create(struct ostream *parent_ostream,
+                                     const unsigned char *public_key,
+                                     uint32_t version);
+
+#endif /* TREES_OSTREAM_H */

@@ -30,11 +30,11 @@
 
 #include <sodium.h>
 
-#include "scrambler-common.h"
-#include "scrambler-ostream.h"
+#include "trees-common.h"
+#include "trees-ostream.h"
 
 
-struct scrambler_ostream {
+struct trees_ostream {
   struct ostream_private ostream;
 
   uint32_t version;
@@ -52,13 +52,13 @@ struct scrambler_ostream {
 };
 
 static ssize_t
-scrambler_ostream_send_header(struct scrambler_ostream *sstream)
+trees_ostream_send_header(struct trees_ostream *sstream)
 {
   char header[HEADER_SIZE];
   uint32_t version_to_host;
 
   /* First set the header magic number. */
-  memcpy(header, scrambler_header, MAGIC_SIZE);
+  memcpy(header, trees_header, MAGIC_SIZE);
   /* Then, put in the version. */
   version_to_host = htonl(sstream->version);
   memcpy(header + MAGIC_SIZE, &version_to_host, VERSION_SIZE);
@@ -73,8 +73,8 @@ scrambler_ostream_send_header(struct scrambler_ostream *sstream)
 }
 
 static ssize_t
-scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
-                             const unsigned char *chunk, size_t chunk_size)
+trees_ostream_send_chunk(struct trees_ostream *sstream,
+                         const unsigned char *chunk, size_t chunk_size)
 {
   int ret;
   /* Extra protection here against overflow. Maybe too agressive! */
@@ -101,13 +101,13 @@ scrambler_ostream_send_chunk(struct scrambler_ostream *sstream,
 }
 
 static ssize_t
-scrambler_ostream_sendv(struct ostream_private *stream,
-                        const struct const_iovec *iov, unsigned int iov_count)
+trees_ostream_sendv(struct ostream_private *stream,
+                    const struct const_iovec *iov, unsigned int iov_count)
 {
   size_t chunk_size;
   ssize_t result = 0, encrypt_result = 0;
   const unsigned char *source, *source_end;
-  struct scrambler_ostream *sstream = (struct scrambler_ostream *) stream;
+  struct trees_ostream *sstream = (struct trees_ostream *) stream;
 
   for (unsigned int index = 0; index < iov_count; index++) {
     source = iov[index].iov_base;
@@ -123,7 +123,7 @@ scrambler_ostream_sendv(struct ostream_private *stream,
         sstream->chunk_buffer_size += chunk_size;
 
         if (sstream->chunk_buffer_size == CHUNK_SIZE) {
-          encrypt_result = scrambler_ostream_send_chunk(sstream,
+          encrypt_result = trees_ostream_send_chunk(sstream,
                                                         sstream->chunk_buffer,
                                                         CHUNK_SIZE);
           if (encrypt_result < 0) {
@@ -132,7 +132,7 @@ scrambler_ostream_sendv(struct ostream_private *stream,
           sstream->chunk_buffer_size = 0;
         }
       } else {
-        encrypt_result = scrambler_ostream_send_chunk(sstream, source,
+        encrypt_result = trees_ostream_send_chunk(sstream, source,
                                                       CHUNK_SIZE);
         if (encrypt_result < 0) {
           return encrypt_result;
@@ -149,26 +149,26 @@ scrambler_ostream_sendv(struct ostream_private *stream,
 
 #ifdef DEBUG_STREAMS
   sstream->in_byte_count += result;
-  i_debug("[scrambler] ostream send (%ld)", result);
+  i_debug("[trees] ostream send (%ld)", result);
 #endif
 
   return result;
 }
 
 static int
-scrambler_ostream_flush(struct ostream_private *stream)
+trees_ostream_flush(struct ostream_private *stream)
 {
   ssize_t result = 0;
-  struct scrambler_ostream *sstream = (struct scrambler_ostream *) stream;
+  struct trees_ostream *sstream = (struct trees_ostream *) stream;
 
   if (sstream->flushed) {
     goto end;
   }
 
-  result = scrambler_ostream_send_chunk(sstream, sstream->chunk_buffer,
+  result = trees_ostream_send_chunk(sstream, sstream->chunk_buffer,
                                         sstream->chunk_buffer_size);
   if (result < 0) {
-    i_error("[scrambler] Error sending last chunk on close");
+    i_error("[trees] Error sending last chunk on close");
     goto end;
   }
   sstream->chunk_buffer_size = 0;
@@ -183,19 +183,19 @@ scrambler_ostream_flush(struct ostream_private *stream)
 
 end:
 #ifdef DEBUG_STREAMS
-  i_debug("[scrambler] ostream flush (%ld)", result);
+  i_debug("[trees] ostream flush (%ld)", result);
 #endif
   return result;
 }
 
 static void
-scrambler_ostream_close(struct iostream_private *stream,
-                        bool close_parent)
+trees_ostream_close(struct iostream_private *stream,
+                    bool close_parent)
 {
-  struct scrambler_ostream *sstream = (struct scrambler_ostream *) stream;
+  struct trees_ostream *sstream = (struct trees_ostream *) stream;
 
 #ifdef DEBUG_STREAMS
-  i_debug("[scrambler] ostream close - %u bytes in / %u bytes out / "
+  i_debug("[trees] ostream close - %u bytes in / %u bytes out / "
           "%u bytes overhead", sstream->in_byte_count,
           sstream->out_byte_count,
           sstream->out_byte_count - sstream->in_byte_count);
@@ -207,11 +207,11 @@ scrambler_ostream_close(struct iostream_private *stream,
 }
 
 struct ostream *
-scrambler_ostream_create(struct ostream *output,
-                         const unsigned char *public_key,
-                         uint32_t version)
+trees_ostream_create(struct ostream *output,
+                     const unsigned char *public_key,
+                     uint32_t version)
 {
-  struct scrambler_ostream *sstream = i_new(struct scrambler_ostream, 1);
+  struct trees_ostream *sstream = i_new(struct trees_ostream, 1);
   struct ostream *result;
 
   sstream->public_key = public_key;
@@ -220,9 +220,9 @@ scrambler_ostream_create(struct ostream *output,
   sstream->chunk_buffer_size = 0;
   sstream->flushed = 0;
 
-  sstream->ostream.iostream.close = scrambler_ostream_close;
-  sstream->ostream.sendv = scrambler_ostream_sendv;
-  sstream->ostream.flush = scrambler_ostream_flush;
+  sstream->ostream.iostream.close = trees_ostream_close;
+  sstream->ostream.sendv = trees_ostream_sendv;
+  sstream->ostream.flush = trees_ostream_flush;
 
 #ifdef DEBUG_STREAMS
   sstream->in_byte_count = 0;
@@ -231,8 +231,8 @@ scrambler_ostream_create(struct ostream *output,
 
   result = o_stream_create(&sstream->ostream, output,
                            o_stream_get_fd(output));
-  if (scrambler_ostream_send_header(sstream) < 0) {
-    i_error("[scrambler] Unable to create ostream");
+  if (trees_ostream_send_header(sstream) < 0) {
+    i_error("[trees] Unable to create ostream");
     return NULL;
   }
 

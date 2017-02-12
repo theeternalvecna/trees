@@ -1,7 +1,8 @@
 AC_PREREQ([2.64])
-AC_INIT([tofu-scrambler],[1.0.0],[],[],[https://0xacab.org/riseuplabs/tofu-scrambler.git])
+AC_INIT([trees],[1.0.0],[https://0xacab.org/riseuplabs/trees/issues],
+        [trees-plugin],[https://0xacab.org/riseuplabs/trees.git])
 
-AC_CONFIG_HEADERS([libscrambler-config.h])
+AC_CONFIG_HEADERS([trees-config.h])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_SRCDIR([src])
 AC_CONFIG_MACRO_DIR([m4])

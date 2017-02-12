@@ -31,23 +31,23 @@
 
 #include <sodium.h>
 
-#include "scrambler-common.h"
+#include "trees-common.h"
 
-const unsigned char scrambler_header[] = { 0xee, 0xff, 0xcc };
+const unsigned char trees_header[] = { 0xee, 0xff, 0xcc };
 
 int
-scrambler_initialize(void)
+trees_initialize(void)
 {
   if (sodium_init() < 0) {
-    i_info("scrambler plugin libsodium failed to initialized.");
+    i_info("trees plugin libsodium failed to initialized.");
     return -1;
   }
-  i_info("scrambler plugin initialized");
+  i_info("trees plugin initialized");
   return 0;
 }
 
 const char *
-scrambler_read_line_fd(pool_t pool, int fd)
+trees_read_line_fd(pool_t pool, int fd)
 {
   string_t *buffer = str_new(pool, MAXIMAL_PASSWORD_LENGTH);
   char *result = str_c_modifiable(buffer);

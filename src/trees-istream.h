@@ -20,13 +20,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SCRAMBLER_ISTREAM_H
-#define SCRAMBLER_ISTREAM_H
+#ifndef TREES_ISTREAM_H
+#define TREES_ISTREAM_H
 
 #include <dovecot/istream.h>
 
-struct istream *scrambler_istream_create(struct istream *input,
-                                         const unsigned char *public_key,
-                                         unsigned char *private_key);
+struct istream *trees_istream_create(struct istream *input,
+                                     const unsigned char *public_key,
+                                     unsigned char *private_key);
 
-#endif /* SCRAMBLER_ISTREAM_H */
+#endif /* TREES_ISTREAM_H */

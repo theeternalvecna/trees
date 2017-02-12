@@ -2,7 +2,7 @@
 
 #
 # This is a simple command line script to create a set of values expected
-# by tofu_scrambler. Useful for testing.
+# by the TREES plugin. Useful for testing.
 #
 # NOTE: this requires rbnacl-4.0.0.pre.gem or newer, or Riseup's fork of rbnacl:
 #
@@ -26,7 +26,7 @@ end
 
 def usage
   puts "USAGE:"
-  puts "   tofu-create --password PASSWORD [OPTIONS]"
+  puts "   trees-create --password PASSWORD [OPTIONS]"
   puts
   puts "OPTIONS may include:"
   puts "   --opslimit OPSLIMIT -- argon2 ops limit, integer in 3..10, or one of"

@@ -28,19 +28,19 @@
 #include <dovecot/istream.h>
 #include <dovecot/istream-private.h>
 
-#include "scrambler-common.h"
-#include "scrambler-istream.h"
+#include "trees-common.h"
+#include "trees-istream.h"
 
-enum scrambler_istream_mode {
+enum trees_istream_mode {
   ISTREAM_MODE_DETECT  = 1,
   ISTREAM_MODE_DECRYPT = 2,
   ISTREAM_MODE_PLAIN   = 3,
 };
 
-struct scrambler_istream {
+struct trees_istream {
   struct istream_private istream;
 
-  enum scrambler_istream_mode mode;
+  enum trees_istream_mode mode;
 
   uint32_t version;
 
@@ -56,9 +56,9 @@ struct scrambler_istream {
 };
 
 static ssize_t
-scrambler_istream_read_parent(struct scrambler_istream *sstream,
-                              size_t minimal_read_size,
-                              size_t minimal_alloc_size)
+trees_istream_read_parent(struct trees_istream *sstream,
+                          size_t minimal_read_size,
+                          size_t minimal_alloc_size)
 {
   struct istream_private *stream = &sstream->istream;
   size_t size;
@@ -85,14 +85,14 @@ scrambler_istream_read_parent(struct scrambler_istream *sstream,
 }
 
 static ssize_t
-scrambler_istream_read_detect_header(struct scrambler_istream *sstream,
-                                    const unsigned char *source)
+trees_istream_read_detect_header(struct trees_istream *sstream,
+                                 const unsigned char *source)
 {
   ssize_t ret;
 
-  /* Check for the scrambler header and if so we have an encrypted email that
+  /* Check for the trees header and if so we have an encrypted email that
    * we'll try to decrypt. */
-  if (!memcmp(scrambler_header, source, MAGIC_SIZE)) {
+  if (!memcmp(trees_header, source, MAGIC_SIZE)) {
     /* Yay we have an encrypted mail! Let's get the version of the plugin it
      * was encrypted for. */
     uint32_t version_to_network;
@@ -101,7 +101,7 @@ scrambler_istream_read_detect_header(struct scrambler_istream *sstream,
     sstream->version = ntohl(version_to_network);
     sstream->mode = ISTREAM_MODE_DECRYPT;
     if (sstream->private_key == NULL) {
-      i_error("[scrambler] No private key for decryption.");
+      i_error("[trees] No private key for decryption.");
       sstream->istream.istream.stream_errno = EACCES;
       sstream->istream.istream.eof = TRUE;
       ret = -1;
@@ -109,7 +109,7 @@ scrambler_istream_read_detect_header(struct scrambler_istream *sstream,
     }
     if (sstream->version < MIN_VERSION ||
         sstream->version > MAX_VERSION) {
-      i_error("[scrambler] Unknown version %" PRIu32 ". Supporting %d to %d",
+      i_error("[trees] Unknown version %" PRIu32 ". Supporting %d to %d",
               sstream->version, MIN_VERSION, MAX_VERSION);
       sstream->istream.istream.stream_errno = EACCES;
       sstream->istream.istream.eof = TRUE;
@@ -128,7 +128,7 @@ end:
 }
 
 static ssize_t
-scrambler_istream_read_detect(struct scrambler_istream *sstream)
+trees_istream_read_detect(struct trees_istream *sstream)
 {
   struct istream_private *stream = &sstream->istream;
   const unsigned char *source;
@@ -138,14 +138,14 @@ scrambler_istream_read_detect(struct scrambler_istream *sstream)
   i_stream_set_max_buffer_size(sstream->istream.parent,
                                MAX_ISTREAM_BUFFER_SIZE);
 
-  result = scrambler_istream_read_parent(sstream, MAGIC_SIZE, 0);
+  result = trees_istream_read_parent(sstream, MAGIC_SIZE, 0);
   if (result <= 0) {
     /* Make sure we return an error here. */
     result = -1;
     goto end;
   }
   source = i_stream_get_data(stream->parent, &source_size);
-  result = scrambler_istream_read_detect_header(sstream, source);
+  result = trees_istream_read_detect_header(sstream, source);
   if (result < 0) {
     goto end;
   }
@@ -163,14 +163,14 @@ end:
 }
 
 static ssize_t
-scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
-                                     unsigned char *destination,
-                                     const unsigned char *source,
-                                     size_t source_size)
+trees_istream_read_decrypt_chunk(struct trees_istream *sstream,
+                                 unsigned char *destination,
+                                 const unsigned char *source,
+                                 size_t source_size)
 {
 #ifdef DEBUG_STREAMS
   sstream->in_byte_count += source_size;
-  i_debug("[scrambler] Decrypt chunk source size: %lu", source_size);
+  i_debug("[trees] Decrypt chunk source size: %lu", source_size);
 #endif
 
   /* Note that we skip the header in the source for decryption. */
@@ -179,7 +179,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
                                      sstream->public_key,
                                      sstream->private_key);
   if (ret != 0) {
-    i_error("[scrambler] Box seal open failed with %ld", ret);
+    i_error("[trees] Box seal open failed with %ld", ret);
     ret = -1;
   } else {
     /* We just decrypted that amount of bytes. */
@@ -189,7 +189,7 @@ scrambler_istream_read_decrypt_chunk(struct scrambler_istream *sstream,
 }
 
 static ssize_t
-scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
+trees_istream_read_decrypt(struct trees_istream *sstream)
 {
   struct istream_private *stream = &sstream->istream;
   const unsigned char *parent_data, *source, *source_end;
@@ -197,7 +197,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
   ssize_t result;
   size_t source_size;
 
-  result = scrambler_istream_read_parent(sstream, ENCRYPTED_CHUNK_SIZE,
+  result = trees_istream_read_parent(sstream, ENCRYPTED_CHUNK_SIZE,
                                          CHUNK_SIZE + stream->pos);
   if (result <= 0 && result != -1) {
     return result;
@@ -211,7 +211,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
   while ((source_end - source) >= ENCRYPTED_CHUNK_SIZE) {
     if (destination_end - destination < CHUNK_SIZE) {
-      i_error("[scrambler] Decrypting to a destination too small. "
+      i_error("[trees] Decrypting to a destination too small. "
               "Expected %ld but remaining %ld. Stopping.",
               destination_end - destination,
               source_end - source);
@@ -222,7 +222,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
     /* Decrypt a chunk of our ENCRYPTED_CHUNK_SIZE as we know that we are
      * expecting at least that amount. */
-    result = scrambler_istream_read_decrypt_chunk(sstream, destination,
+    result = trees_istream_read_decrypt_chunk(sstream, destination,
                                                   source,
                                                   ENCRYPTED_CHUNK_SIZE);
     if (result < 0) {
@@ -245,7 +245,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
       stream->istream.eof = FALSE;
 
       if (destination_end - destination < CHUNK_SIZE) {
-        i_error("[scrambler] At EOF, decrypting to a destination too small. "
+        i_error("[trees] At EOF, decrypting to a destination too small. "
                 "Expected %ld but remaining %ld",
                 destination_end - destination,
                 source_end - source);
@@ -254,7 +254,7 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
         return -1;
       }
 
-      result = scrambler_istream_read_decrypt_chunk(sstream, destination,
+      result = trees_istream_read_decrypt_chunk(sstream, destination,
                                                     source,
                                                     source_end - source);
       if (result < 0) {
@@ -282,21 +282,21 @@ scrambler_istream_read_decrypt(struct scrambler_istream *sstream)
 
 #ifdef DEBUG_STREAMS
   sstream->out_byte_count += result;
-  i_debug("[scrambler] Read decrypt %ld bytes", result);
+  i_debug("[trees] Read decrypt %ld bytes", result);
 #endif
 
   return result;
 }
 
 static ssize_t
-scrambler_istream_read_plain(struct scrambler_istream *sstream)
+trees_istream_read_plain(struct trees_istream *sstream)
 {
   size_t source_size, copy_size;
   ssize_t result;
   const unsigned char *source;
   struct istream_private *stream = &sstream->istream;
 
-  result = scrambler_istream_read_parent(sstream, 1, 0);
+  result = trees_istream_read_parent(sstream, 1, 0);
   if (result <= 0) {
     return result;
   }
@@ -317,13 +317,13 @@ scrambler_istream_read_plain(struct scrambler_istream *sstream)
 }
 
 static ssize_t
-scrambler_istream_read(struct istream_private *stream)
+trees_istream_read(struct istream_private *stream)
 {
   int ret;
-  struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
+  struct trees_istream *sstream = (struct trees_istream *) stream;
 
   if (sstream->mode == ISTREAM_MODE_DETECT) {
-    ret = scrambler_istream_read_detect(sstream);
+    ret = trees_istream_read_detect(sstream);
     if (ret < 0) {
       return ret;
     }
@@ -332,9 +332,9 @@ scrambler_istream_read(struct istream_private *stream)
   /* We've now detected the mode, process it. */
   switch (sstream->mode) {
   case ISTREAM_MODE_DECRYPT:
-    return scrambler_istream_read_decrypt(sstream);
+    return trees_istream_read_decrypt(sstream);
   case ISTREAM_MODE_PLAIN:
-    return scrambler_istream_read_plain(sstream);
+    return trees_istream_read_plain(sstream);
   case ISTREAM_MODE_DETECT:
     /* Something went terribly wrong. */
     assert(0);
@@ -345,13 +345,13 @@ scrambler_istream_read(struct istream_private *stream)
 }
 
 static void
-scrambler_istream_seek(struct istream_private *stream, uoff_t v_offset,
-                       bool mark)
+trees_istream_seek(struct istream_private *stream, uoff_t v_offset,
+                   bool mark)
 {
-  struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
+  struct trees_istream *sstream = (struct trees_istream *) stream;
 
 #ifdef DEBUG_STREAMS
-  i_debug("[scrambler] istream seek %d / %d / %d",
+  i_debug("[trees] istream seek %d / %d / %d",
           (int)stream->istream.v_offset, (int)v_offset, (int)mark);
 #endif
 
@@ -375,7 +375,7 @@ scrambler_istream_seek(struct istream_private *stream, uoff_t v_offset,
 }
 
 static int
-scrambler_istream_stat(struct istream_private *stream, bool exact)
+trees_istream_stat(struct istream_private *stream, bool exact)
 {
   const struct stat *stat;
   if (i_stream_stat(stream->parent, exact, &stat) < 0) {
@@ -386,12 +386,12 @@ scrambler_istream_stat(struct istream_private *stream, bool exact)
 }
 
 static void
-scrambler_istream_close(struct iostream_private *stream, bool close_parent)
+trees_istream_close(struct iostream_private *stream, bool close_parent)
 {
-  struct scrambler_istream *sstream = (struct scrambler_istream *) stream;
+  struct trees_istream *sstream = (struct trees_istream *) stream;
 
 #ifdef DEBUG_STREAMS
-  i_debug("[scrambler] istream close - %u bytes in / %u bytes out / "
+  i_debug("[trees] istream close - %u bytes in / %u bytes out / "
           "%u bytes overhead", sstream->in_byte_count,
           sstream->out_byte_count,
           sstream->in_byte_count - sstream->out_byte_count);
@@ -403,11 +403,11 @@ scrambler_istream_close(struct iostream_private *stream, bool close_parent)
 }
 
 struct istream *
-scrambler_istream_create(struct istream *input,
-                         const unsigned char *public_key,
-                         unsigned char *private_key)
+trees_istream_create(struct istream *input,
+                     const unsigned char *public_key,
+                     unsigned char *private_key)
 {
-  struct scrambler_istream *sstream = i_new(struct scrambler_istream, 1);
+  struct trees_istream *sstream = i_new(struct trees_istream, 1);
 
   sstream->mode = ISTREAM_MODE_DETECT;
 
@@ -416,11 +416,11 @@ scrambler_istream_create(struct istream *input,
 
   sstream->last_chunk_read = 0;
 
-  sstream->istream.iostream.close = scrambler_istream_close;
+  sstream->istream.iostream.close = trees_istream_close;
   sstream->istream.max_buffer_size = input->real_stream->max_buffer_size;
-  sstream->istream.read = scrambler_istream_read;
-  sstream->istream.seek = scrambler_istream_seek;
-  sstream->istream.stat = scrambler_istream_stat;
+  sstream->istream.read = trees_istream_read;
+  sstream->istream.seek = trees_istream_seek;
+  sstream->istream.stat = trees_istream_stat;
 
   sstream->istream.istream.readable_fd = FALSE;
   sstream->istream.istream.blocking = input->blocking;

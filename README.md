@@ -1,12 +1,12 @@
-Tofu Scrambler - A NaCL-based Dovecot encryption plugin
+TREES - A NaCL-based Dovecot encryption plugin
 =======================================================
 
 This plugin adds individually encrypted mail storage to the Dovecot IMAP
 server.
 
 This plugin is inspired by Posteo's [scrambler](https://github.com/posteo
-/scrambler-plugin) which uses OpenSSL and RSA keypairs. Tofu Scrambler works in
-a similar way, but uses the Sodium crypto library (based on NaCL).
+/scrambler-plugin) which uses OpenSSL and RSA keypairs. TREES works in a
+similar way, but uses the Sodium crypto library (based on NaCL).
 
 How it works:
 
@@ -45,11 +45,11 @@ Installation
 
 * Type `make` to compile the plugin.
 
-* Find the plugin at `src/.libs/lib18_scrambler_plugin.so`.
+* Find the plugin at `src/.libs/lib18_trees_plugin.so`.
 
 * Copy to `/usr/lib/dovecot/modules/`
 
-* Enable the plugin. For example, add `mail_plugins = expire quota scrambler`
+* Enable the plugin. For example, add `mail_plugins = expire quota trees`
   to `/etc/dovecot/conf.d/10-mail.conf`
 
 See below for how to configure the plugin.
@@ -60,24 +60,24 @@ Database
 In order to run, the plugin needs the following configuration values (via the
 dovecot environment).
 
-* `scrambler_password` The plain user password. It's used to unlock the
-  `scrambler_locked_secretbox` in order to get access to the private key.
+* `trees_password` The plain user password. It's used to unlock the
+  `trees_locked_secretbox` in order to get access to the private key.
 
-* `scrambler_enabled` Can be either the integer `1` or `0`.
+* `trees_enabled` Can be either the integer `1` or `0`.
 
-* `scrambler_public_key` The public Curve25519 key of the user (hex string).
+* `trees_public_key` The public Curve25519 key of the user (hex string).
 
-* `scrambler_locked_secretbox` contains the Curve25519 private key of a user
+* `trees_locked_secretbox` contains the Curve25519 private key of a user
   which is locked using the argon2 digest of the user's password (hex string).
 
-* `scrambler_sk_nonce` 24 byte random nonce for locked_secretbox (hex string).
+* `trees_sk_nonce` 24 byte random nonce for `locked_secretbox` (hex string).
 
-* `scrambler_pwhash_opslimit` argon2 CPU usage parameter (3..10 int).
+* `trees_pwhash_opslimit` argon2 CPU usage parameter (3..10 int).
 
-* `scrambler_pwhash_memlimit` argon2 memory usage parameter (must be in range
+* `trees_pwhash_memlimit` argon2 memory usage parameter (must be in range
   8192 bytes to 4 TB, expressed in bytes).
 
-* `scrambler_pwhash_salt` 16 byte random argon2 salt (hex string).
+* `trees_pwhash_salt` 16 byte random argon2 salt (hex string).
 
 An example database scheme for this might be:
 
@@ -114,8 +114,8 @@ Dovecot Configuration
 
 * `default_pass_scheme = ARGON2` recommended (Note: this will use the crypt-
   style argon2 digest string for authentication, which is a very different
-  format than is used by tofu-scrambler. It is out of tofu-scrambler's scope
-  how to set up Argon2 authentication with Dovecot).
+  format than is used by TREES. It is out of TREES's scope how to set up
+  Argon2 authentication with Dovecot).
 
 SQL Configuration
 -------------------------------------
@@ -155,14 +155,14 @@ Here is a dovecot SQL query configuration that will work with the sample
       8                                         AS userdb_uid, \
       8                                         AS userdb_gid, \
       CONCAT('/maildir/', mailboxes.maildir)    AS userdb_home, \
-      REPLACE('%w', '%%', '%%%%')               AS userdb_scrambler_password, \
-      storage_keys.enabled                      AS userdb_scrambler_enabled, \
-      storage_keys.public_key                   AS userdb_scrambler_public_key, \
-      storage_keys.locked_secretbox             AS userdb_scrambler_locked_secretbox, \
-      storage_keys.sk_nonce                     AS userdb_scrambler_sk_nonce, \
-      storage_keys.pwhash_opslimit              AS userdb_scrambler_pwhash_opslimit, \
-      storage_keys.pwhash_memlimit              AS userdb_scrambler_pwhash_memlimit, \
-      storage_keys.pwhash_salt                  AS userdb_scrambler_pwhash_salt \
+      REPLACE('%w', '%%', '%%%%')               AS userdb_trees_password, \
+      storage_keys.enabled                      AS userdb_trees_enabled, \
+      storage_keys.public_key                   AS userdb_trees_public_key, \
+      storage_keys.locked_secretbox             AS userdb_trees_locked_secretbox, \
+      storage_keys.sk_nonce                     AS userdb_trees_sk_nonce, \
+      storage_keys.pwhash_opslimit              AS userdb_trees_pwhash_opslimit, \
+      storage_keys.pwhash_memlimit              AS userdb_trees_pwhash_memlimit, \
+      storage_keys.pwhash_salt                  AS userdb_trees_pwhash_salt \
       FROM mailboxes \
       LEFT OUTER JOIN storage_keys ON mailboxes.user_id = storage_keys.user_id \
       WHERE mailboxes.username = '%n' AND mailboxes.domain = '%d' \
@@ -179,8 +179,8 @@ Here is a dovecot SQL query configuration that will work with the sample
       8                                         AS uid, \
       8                                         AS gid, \
       CONCAT('/maildir/', mailboxes.maildir)    AS home, \
-      storage_keys.enabled                      AS scrambler_enabled, \
-      storage_keys.public_key                   AS scrambler_public_key, \
+      storage_keys.enabled                      AS trees_enabled, \
+      storage_keys.public_key                   AS trees_public_key, \
       CONCAT('*:bytes=', mailboxes.quota)       AS quota_rule \
       FROM mailboxes \
       LEFT OUTER JOIN storage_keys ON mailboxes.user_id = storage_keys.user_id \
@@ -188,14 +188,14 @@ Here is a dovecot SQL query configuration that will work with the sample
       AND mailboxes.is_active = 1
 
 The odd line `REPLACE('%w', '%%', '%%%%')` is needed to pass the cleartext
-password to tofu-scrambler, and allow `%` as a valid password character.
+password to TREES, and allow `%` as a valid password character.
 
 Argon2 Parameters
 ----------------------------------------------
 
 There are three recommended levels for the Argon2 parameters, Interactive,
-Moderate, and Sensitive. In the case of tofu-scrambler, setting the parameters
-at Moderate or Sensitive will make checking email very slow.
+Moderate, and Sensitive. In the case of TREES, setting the parameters at
+Moderate or Sensitive will make checking email very slow.
 
 Interactive: For interactive, online operations, that need to be fast, a
 reasonable minimum is:

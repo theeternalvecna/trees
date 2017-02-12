@@ -18,8 +18,8 @@ Makefile.in
 configure
 aclocal.m4
 autom4te.cache/
-libscrambler-config.h
-libscrambler-config.h.in
+trees-config.h
+trees-config.h.in
 config.log
 config.status
 stamp-h1

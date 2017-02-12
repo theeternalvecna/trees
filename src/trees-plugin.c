@@ -40,19 +40,19 @@
 
 #include <sodium.h>
 
-#include "scrambler-plugin.h"
-#include "scrambler-common.h"
-#include "scrambler-ostream.h"
-#include "scrambler-istream.h"
+#include "trees-plugin.h"
+#include "trees-common.h"
+#include "trees-ostream.h"
+#include "trees-istream.h"
 
-#define SCRAMBLER_CONTEXT(obj) \
-  MODULE_CONTEXT(obj, scrambler_storage_module)
-#define SCRAMBLER_MAIL_CONTEXT(obj) \
-	MODULE_CONTEXT(obj, scrambler_mail_module)
-#define SCRAMBLER_USER_CONTEXT(obj) \
-	MODULE_CONTEXT(obj, scrambler_user_module)
+#define TREES_CONTEXT(obj) \
+  MODULE_CONTEXT(obj, trees_storage_module)
+#define TREES_MAIL_CONTEXT(obj) \
+	MODULE_CONTEXT(obj, trees_mail_module)
+#define TREES_USER_CONTEXT(obj) \
+	MODULE_CONTEXT(obj, trees_user_module)
 
-struct scrambler_user {
+struct trees_user {
   /* Dovecot module context. */
   union mail_user_module_context module_ctx;
 
@@ -71,25 +71,25 @@ struct scrambler_user {
   unsigned char private_key[crypto_box_SECRETKEYBYTES];
 };
 
-const char *scrambler_plugin_version = DOVECOT_ABI_VERSION;
+const char *trees_plugin_version = DOVECOT_ABI_VERSION;
 
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_storage_module,
+static MODULE_CONTEXT_DEFINE_INIT(trees_storage_module,
                                   &mail_storage_module_register);
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_mail_module,
+static MODULE_CONTEXT_DEFINE_INIT(trees_mail_module,
                                   &mail_module_register);
-static MODULE_CONTEXT_DEFINE_INIT(scrambler_user_module,
+static MODULE_CONTEXT_DEFINE_INIT(trees_user_module,
                                   &mail_user_module_register);
 
 static const char *
-scrambler_get_string_setting(struct mail_user *user, const char *name)
+trees_get_string_setting(struct mail_user *user, const char *name)
 {
   return mail_user_plugin_getenv(user, name);
 }
 
 static unsigned long long int
-scrambler_get_ullong_setting(struct mail_user *user, const char *name)
+trees_get_ullong_setting(struct mail_user *user, const char *name)
 {
-  const char *value = scrambler_get_string_setting(user, name);
+  const char *value = trees_get_string_setting(user, name);
   if (value == NULL) {
     return ULLONG_MAX;
   }
@@ -97,9 +97,9 @@ scrambler_get_ullong_setting(struct mail_user *user, const char *name)
 }
 
 static int
-scrambler_get_integer_setting(struct mail_user *user, const char *name)
+trees_get_integer_setting(struct mail_user *user, const char *name)
 {
-  const char *value = scrambler_get_string_setting(user, name);
+  const char *value = trees_get_string_setting(user, name);
   if (value == NULL) {
     return -1;
   }
@@ -107,12 +107,12 @@ scrambler_get_integer_setting(struct mail_user *user, const char *name)
 }
 
 static int
-scrambler_get_user_hexdata(struct mail_user *user, const char *param,
-                           unsigned char *out, size_t out_len)
+trees_get_user_hexdata(struct mail_user *user, const char *param,
+                       unsigned char *out, size_t out_len)
 {
   const char *hex_str;
 
-  hex_str = scrambler_get_string_setting(user, param);
+  hex_str = trees_get_string_setting(user, param);
   if (hex_str == NULL) {
     goto error;
   }
@@ -121,7 +121,7 @@ scrambler_get_user_hexdata(struct mail_user *user, const char *param,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to convert %s for user %s.", param,
                                   user->username);
-    i_error("[scrambler] Failing to hex2bin for %s", param);
+    i_error("[trees] Failing to hex2bin for %s", param);
     goto error;
   }
 
@@ -132,8 +132,8 @@ error:
 }
 
 static int
-scrambler_get_private_key(struct mail_user *user,
-                          struct scrambler_user *suser)
+trees_get_private_key(struct mail_user *user,
+                      struct trees_user *suser)
 {
   int have_salt, password_fd;
   unsigned long long opslimit, memlimit;
@@ -148,10 +148,10 @@ scrambler_get_private_key(struct mail_user *user,
   const char *password;
 
   /* Get the user password that we'll use to . */
-  password = scrambler_get_string_setting(user, "scrambler_password");
-  password_fd = scrambler_get_integer_setting(user, "scrambler_password_fd");
+  password = trees_get_string_setting(user, "trees_password");
+  password_fd = trees_get_integer_setting(user, "trees_password_fd");
   if (password == NULL && password_fd >= 0) {
-    password = scrambler_read_line_fd(user->pool, password_fd);
+    password = trees_read_line_fd(user->pool, password_fd);
   }
 
   /* No password means that we are receiving email and have no access to the
@@ -161,32 +161,32 @@ scrambler_get_private_key(struct mail_user *user,
   }
 
   /* Get the nonce. */
-  if (scrambler_get_user_hexdata(user, "scrambler_sk_nonce",
+  if (trees_get_user_hexdata(user, "trees_sk_nonce",
                                  sk_nonce, sizeof(sk_nonce))) {
     user->error = p_strdup_printf(user->pool,
                                   "Unable to find nonce value for user %s.",
                                   user->username);
-    i_error("[scrambler] Unable to get sk_nonce.");
+    i_error("[trees] Unable to get sk_nonce.");
     goto error;
   }
 
   /* Get the opslimit and memlimit. */
-  opslimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_opslimit");
+  opslimit = trees_get_ullong_setting(user, "trees_pwhash_opslimit");
   if (opslimit == ULLONG_MAX) {
-    i_error("[scrambler] Bad pwhash_opslimit value.");
+    i_error("[trees] Bad pwhash_opslimit value.");
     goto error;
   }
-  memlimit = scrambler_get_ullong_setting(user, "scrambler_pwhash_memlimit");
+  memlimit = trees_get_ullong_setting(user, "trees_pwhash_memlimit");
   if (memlimit == ULLONG_MAX) {
-    i_error("[scrambler] Bad pwhash_memlimit value.");
+    i_error("[trees] Bad pwhash_memlimit value.");
     goto error;
   }
 
-  /* Get the scrambler user salt. It's possible that it's not available. */
-  have_salt = scrambler_get_user_hexdata(user, "scrambler_pwhash_salt",
+  /* Get the trees user salt. It's possible that it's not available. */
+  have_salt = trees_get_user_hexdata(user, "trees_pwhash_salt",
                                          pw_salt, sizeof(pw_salt));
   if (have_salt == -1) {
-    i_error("[scrambler] Unable to get the pwhash_salt.");
+    i_error("[trees] Unable to get the pwhash_salt.");
     goto end;
   }
 
@@ -199,19 +199,19 @@ scrambler_get_private_key(struct mail_user *user,
     user->error = p_strdup_printf(user->pool,
                                   "Unable to derive private key for user %s.",
                                   user->username);
-    i_error("[scrambler] pwhash failed for %s", user->username);
+    i_error("[trees] pwhash failed for %s", user->username);
     goto error;
   }
 
-  if (scrambler_get_user_hexdata(user, "scrambler_locked_secretbox",
+  if (trees_get_user_hexdata(user, "trees_locked_secretbox",
                                  secretbox, sizeof(secretbox))) {
-    i_error("[scrambler] Unable to get locked_secretbox");
+    i_error("[trees] Unable to get locked_secretbox");
     goto error;
   }
 
   if (crypto_secretbox_open_easy(suser->private_key, secretbox,
                                  sizeof(secretbox), sk_nonce, sk) < 0) {
-    i_error("[scrambler] Unable to open secretbox.");
+    i_error("[trees] Unable to open secretbox.");
     goto error;
   }
   /* Got the private key! */
@@ -225,20 +225,20 @@ error:
 }
 
 static void
-scrambler_mail_user_created(struct mail_user *user)
+trees_mail_user_created(struct mail_user *user)
 {
   int version;
   struct mail_user_vfuncs *v = user->vlast;
-  struct scrambler_user *suser;
+  struct trees_user *suser;
 
-  suser = p_new(user->pool, struct scrambler_user, 1);
+  suser = p_new(user->pool, struct trees_user, 1);
   memset(suser, 0, sizeof(*suser));
 
   suser->module_ctx.super = *v;
   user->vlast = &suser->module_ctx.super;
 
-  /* Does this user should use the scrambler or not? */
-  suser->enabled = scrambler_get_integer_setting(user, "scrambler_enabled");
+  /* Does this user should use the trees or not? */
+  suser->enabled = trees_get_integer_setting(user, "trees_enabled");
   if (suser->enabled == -1 || suser->enabled == 0) {
     /* Not present means disabled. Stop right now because we won't use
      * anything of this plugin for the user. */
@@ -247,19 +247,19 @@ scrambler_mail_user_created(struct mail_user *user)
   }
 
   /* Get plugin version that the user is configured for. */
-  version = scrambler_get_integer_setting(user, "scrambler_version");
+  version = trees_get_integer_setting(user, "trees_version");
   if (version < MIN_VERSION || version > MAX_VERSION) {
-    i_error("[scrambler] Bad version value.");
+    i_error("[trees] Bad version value.");
     goto end;
   }
   suser->version = (uint32_t) version;
 
   /* Getting user public key. Without it, we can't do much so error if we
    * can't find it. */
-  if (scrambler_get_user_hexdata(user, "scrambler_public_key",
+  if (trees_get_user_hexdata(user, "trees_public_key",
                                  suser->public_key,
                                  sizeof(suser->public_key))) {
-    i_error("[scrambler] Unable to find public_key");
+    i_error("[trees] Unable to find public_key");
     goto end;
   }
   suser->public_key_set = 1;
@@ -269,21 +269,21 @@ scrambler_mail_user_created(struct mail_user *user)
    * email. If we are successful at getting the private key, this flag will
    * be set to 1. */
   suser->private_key_set = 0;
-  if (scrambler_get_private_key(user, suser) < 0) {
+  if (trees_get_private_key(user, suser) < 0) {
     goto end;
   }
 
 end:
-  MODULE_CONTEXT_SET(user, scrambler_user_module, suser);
+  MODULE_CONTEXT_SET(user, trees_user_module, suser);
 }
 
 static int
-scrambler_mail_save_begin(struct mail_save_context *context,
-                          struct istream *input)
+trees_mail_save_begin(struct mail_save_context *context,
+                      struct istream *input)
 {
   struct mailbox *box = context->transaction->box;
-  union mailbox_module_context *mbox = SCRAMBLER_CONTEXT(box);
-  struct scrambler_user *suser = SCRAMBLER_USER_CONTEXT(box->storage->user);
+  union mailbox_module_context *mbox = TREES_CONTEXT(box);
+  struct trees_user *suser = TREES_USER_CONTEXT(box->storage->user);
   struct ostream *output;
 
   if (mbox->super.save_begin(context, input) < 0) {
@@ -296,21 +296,21 @@ scrambler_mail_save_begin(struct mail_save_context *context,
 
   if (!suser->public_key_set) {
     /* No public key for a user that have the plugin enabled is not good. */
-    i_error("[scrambler] User public key not found. Skipping.");
+    i_error("[trees] User public key not found. Skipping.");
     goto end;
   }
 
   // TODO: find a better solution for this. this currently works, because
-  // there is only one other ostream (zlib) in the setup. the scrambler should
+  // there is only one other ostream (zlib) in the setup. the trees should
   // be added to the other end of the ostream chain, not to the
   // beginning (the usual way).
   if (context->data.output->real_stream->parent == NULL) {
-    output = scrambler_ostream_create(context->data.output,
+    output = trees_ostream_create(context->data.output,
                                       suser->public_key, suser->version);
     o_stream_unref(&context->data.output);
     context->data.output = output;
   } else {
-    output = scrambler_ostream_create(context->data.output->real_stream->parent,
+    output = trees_ostream_create(context->data.output->real_stream->parent,
                                       suser->public_key, suser->version);
     o_stream_unref(&context->data.output->real_stream->parent);
     context->data.output->real_stream->parent = output;
@@ -321,7 +321,7 @@ end:
 }
 
 static void
-scrambler_mailbox_allocated(struct mailbox *box)
+trees_mailbox_allocated(struct mailbox *box)
 {
   struct mailbox_vfuncs *v = box->vlast;
   union mailbox_module_context *mbox;
@@ -331,28 +331,28 @@ scrambler_mailbox_allocated(struct mailbox *box)
   mbox->super = *v;
   box->vlast = &mbox->super;
 
-  MODULE_CONTEXT_SET_SELF(box, scrambler_storage_module, mbox);
+  MODULE_CONTEXT_SET_SELF(box, trees_storage_module, mbox);
 
   if ((class_flags & MAIL_STORAGE_CLASS_FLAG_OPEN_STREAMS) == 0) {
-    v->save_begin = scrambler_mail_save_begin;
+    v->save_begin = trees_mail_save_begin;
   }
 }
 
 static int
-scrambler_istream_opened(struct mail *_mail, struct istream **stream)
+trees_istream_opened(struct mail *_mail, struct istream **stream)
 {
   unsigned char *private_key = NULL;
   struct mail_private *mail = (struct mail_private *)_mail;
   struct mail_user *user = _mail->box->storage->user;
-  struct scrambler_user *suser = SCRAMBLER_USER_CONTEXT(user);
-  union mail_module_context *mmail = SCRAMBLER_MAIL_CONTEXT(mail);
+  struct trees_user *suser = TREES_USER_CONTEXT(user);
+  union mail_module_context *mmail = TREES_MAIL_CONTEXT(mail);
   struct istream *input;
 
   input = *stream;
   if (suser->private_key_set) {
     private_key = suser->private_key;
   }
-  *stream = scrambler_istream_create(input, suser->public_key,
+  *stream = trees_istream_create(input, suser->public_key,
                                      private_key);
   i_stream_unref(&input);
 
@@ -360,7 +360,7 @@ scrambler_istream_opened(struct mail *_mail, struct istream **stream)
 }
 
 static void
-scrambler_mail_allocated(struct mail *_mail)
+trees_mail_allocated(struct mail *_mail)
 {
   struct mail_private *mail = (struct mail_private *)_mail;
   struct mail_vfuncs *v = mail->vlast;
@@ -370,29 +370,29 @@ scrambler_mail_allocated(struct mail *_mail)
   mmail->super = *v;
   mail->vlast = &mmail->super;
 
-  v->istream_opened = scrambler_istream_opened;
+  v->istream_opened = trees_istream_opened;
 
-  MODULE_CONTEXT_SET_SELF(mail, scrambler_mail_module, mmail);
+  MODULE_CONTEXT_SET_SELF(mail, trees_mail_module, mmail);
 }
 
-static struct mail_storage_hooks scrambler_mail_storage_hooks = {
-  .mail_user_created = scrambler_mail_user_created,
-  .mailbox_allocated = scrambler_mailbox_allocated,
-  .mail_allocated = scrambler_mail_allocated
+static struct mail_storage_hooks trees_mail_storage_hooks = {
+  .mail_user_created = trees_mail_user_created,
+  .mailbox_allocated = trees_mailbox_allocated,
+  .mail_allocated = trees_mail_allocated
 };
 
 void
-scrambler_plugin_init(struct module *module)
+trees_plugin_init(struct module *module)
 {
-  if (scrambler_initialize() < 0) {
+  if (trees_initialize() < 0) {
     /* Don't hook anything has we weren't able to initialize ourself. */
     return;
   }
-  mail_storage_hooks_add(module, &scrambler_mail_storage_hooks);
+  mail_storage_hooks_add(module, &trees_mail_storage_hooks);
 }
 
 void
-scrambler_plugin_deinit(void)
+trees_plugin_deinit(void)
 {
-  mail_storage_hooks_remove(&scrambler_mail_storage_hooks);
+  mail_storage_hooks_remove(&trees_mail_storage_hooks);
 }
