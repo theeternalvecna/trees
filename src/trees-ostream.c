@@ -20,7 +20,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
 #include <arpa/inet.h>
 #include <string.h>
 
@@ -84,10 +83,14 @@ trees_ostream_send_chunk(struct trees_ostream *sstream,
                          const unsigned char *chunk, size_t chunk_size)
 {
   ssize_t ret;
-  /* Extra protection here against overflow. Maybe too agressive! */
-  assert(chunk_size < (SSIZE_MAX - crypto_box_SEALBYTES));
   size_t ciphertext_len = crypto_box_SEALBYTES + chunk_size;
   unsigned char ciphertext[ciphertext_len];
+
+  /* Extra protection here against overflow. */
+  if (chunk_size < (SSIZE_MAX - crypto_box_SEALBYTES)) {
+    sstream->ostream.ostream.stream_errno = EIO;
+    goto err;
+  }
 
   sodium_memzero(ciphertext, sizeof(ciphertext));
   ret = crypto_box_seal(ciphertext, chunk, chunk_size,
