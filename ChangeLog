@@ -1,0 +1,35 @@
+2015-07-17 trees 2.0.0 (First Drumpf General Strike)
+	* Don't use assert() for an overflow check
+	* Use SSIZE_MAX in trees_ostream_send_chunk() check
+	* Handle error code in trees_ostream_send_header()
+	* Handle error code in trees_ostream_send_chunk()
+	* Remove buggy use of trees_password_fd
+	* Rename project from tofu-scrambler to trees
+	* Fix README with compile instruction
+	* Update README with latest info
+	* Update author and remove uneeded CONTRIBUTORS file
+	* Massive cleanup of unused files
+	* Handle missing switch case found by GCC
+	* Add autoconf support for a proper build system
+	* Validate the version from the header
+	* Actually write the version in the email header
+	* Add version capability
+	* Merge branch 'feature/tofu-create' into 'master'
+	* fix typos in README.md
+	* updated README.md
+	* Don't check private key if detecting header
+	* Pass a NULL pointer if no private key set
+	* Extra protection on the private key when decrypting
+	* Don't fail if private key not found. Also, set errno on decrypt error
+	* Really fix the enabled flag
+	* added tofu-create script, for testing purposes
+	* Actually check for a disabled user
+	* Enable flag has to be signed to detect errors
+	* Remove unused OpenSSL header file include
+	* Massive amount of fixes
+	* Skip private key if no user password
+	* Implement private key unlocked by password
+	* Use libsodium memzero function to wipe private key
+	* Use libsodium crypto box and dump OpenSSL RSA/AES
+	* Beautify the rest of the code base
+	* Beautify scrambler-plugin.c
