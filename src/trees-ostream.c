@@ -76,7 +76,7 @@ static ssize_t
 trees_ostream_send_chunk(struct trees_ostream *sstream,
                          const unsigned char *chunk, size_t chunk_size)
 {
-  int ret;
+  ssize_t ret;
   /* Extra protection here against overflow. Maybe too agressive! */
   assert(chunk_size < (SIZE_MAX - crypto_box_SEALBYTES));
   size_t ciphertext_len = crypto_box_SEALBYTES + chunk_size;
@@ -87,9 +87,13 @@ trees_ostream_send_chunk(struct trees_ostream *sstream,
                         sstream->public_key);
   if (ret < 0) {
     sstream->ostream.ostream.stream_errno = EACCES;
-    return ret;
+    goto err;
   }
-  o_stream_send(sstream->ostream.parent, ciphertext, ciphertext_len);
+  ret = o_stream_send(sstream->ostream.parent, ciphertext, ciphertext_len);
+  if (ret != (ssize_t) ciphertext_len) {
+    o_stream_copy_error_from_parent(&sstream->ostream);
+    goto err;
+  }
 
 #ifdef DEBUG_STREAMS
   sstream->out_byte_count += ciphertext_len;
@@ -98,6 +102,8 @@ trees_ostream_send_chunk(struct trees_ostream *sstream,
   /* Return the size of the plaintext so dovecot gets the right size for the
    * istream after decryption. */
   return chunk_size;
+err:
+  return -1;
 }
 
 static ssize_t
