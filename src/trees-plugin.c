@@ -135,7 +135,7 @@ static int
 trees_get_private_key(struct mail_user *user,
                       struct trees_user *suser)
 {
-  int have_salt, password_fd;
+  int have_salt;
   unsigned long long opslimit, memlimit;
   unsigned char pw_salt[crypto_pwhash_SALTBYTES];
   unsigned char sk_nonce[crypto_secretbox_NONCEBYTES];
@@ -149,10 +149,6 @@ trees_get_private_key(struct mail_user *user,
 
   /* Get the user password that we'll use to . */
   password = trees_get_string_setting(user, "trees_password");
-  password_fd = trees_get_integer_setting(user, "trees_password_fd");
-  if (password == NULL && password_fd >= 0) {
-    password = trees_read_line_fd(user->pool, password_fd);
-  }
 
   /* No password means that we are receiving email and have no access to the
    * user private data so stop now. */

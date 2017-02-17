@@ -46,35 +46,6 @@ trees_initialize(void)
   return 0;
 }
 
-const char *
-trees_read_line_fd(pool_t pool, int fd)
-{
-  string_t *buffer = str_new(pool, MAXIMAL_PASSWORD_LENGTH);
-  char *result = str_c_modifiable(buffer);
-  char *pointer = result;
-
-  ssize_t read_result = read(fd, pointer, 1);
-  unsigned int bytes_read = 0;
-  while (read_result != -1 && pointer[0] != '\n') {
-    pointer++;
-    bytes_read++;
-
-    if (bytes_read > MAXIMAL_PASSWORD_LENGTH) {
-      i_error("error reading form fd %d: password too long", fd);
-      break;
-    }
-
-    read_result = read(fd, pointer, 1);
-  }
-
-  pointer[0] = 0;
-
-  if (read_result == -1)
-    i_error("error reading from fd %d: %s (%d)", fd, strerror(errno), errno);
-
-  return result;
-}
-
 #ifdef DEBUG_STREAMS
 
 void

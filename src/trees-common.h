@@ -37,7 +37,6 @@
 /* Aligns with the docevot default buffer size. */
 #define CHUNK_SIZE 8192
 #define ENCRYPTED_CHUNK_SIZE (crypto_box_SEALBYTES + CHUNK_SIZE)
-#define MAXIMAL_PASSWORD_LENGTH 256
 #define MAX_ISTREAM_BUFFER_SIZE (ENCRYPTED_CHUNK_SIZE * 2)
 
 #define MIN(a,b) \
