@@ -66,10 +66,17 @@ trees_ostream_send_header(struct trees_ostream *sstream)
   /* The header here consists of a magic number. */
   ssize_t ret = o_stream_send(sstream->ostream.parent, header,
                               sizeof(header));
+  if (ret != sizeof(header)) {
+    o_stream_copy_error_from_parent(&sstream->ostream);
+    goto err;
+  }
+
 #ifdef DEBUG_STREAMS
-  sstream->out_byte_count += sizeof(header);
+  sstream->out_byte_count += ret;
 #endif
   return ret;
+err:
+  return -1;
 }
 
 static ssize_t
