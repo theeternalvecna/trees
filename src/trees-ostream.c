@@ -85,7 +85,7 @@ trees_ostream_send_chunk(struct trees_ostream *sstream,
 {
   ssize_t ret;
   /* Extra protection here against overflow. Maybe too agressive! */
-  assert(chunk_size < (SIZE_MAX - crypto_box_SEALBYTES));
+  assert(chunk_size < (SSIZE_MAX - crypto_box_SEALBYTES));
   size_t ciphertext_len = crypto_box_SEALBYTES + chunk_size;
   unsigned char ciphertext[ciphertext_len];
 
