@@ -4,8 +4,9 @@ TREES - A NaCL-based Dovecot encryption plugin
 This plugin adds individually encrypted mail storage to the Dovecot IMAP
 server.
 
-This plugin is inspired by Posteo's [scrambler](https://github.com/posteo
-/scrambler-plugin) which uses OpenSSL and RSA keypairs. TREES works in a
+This plugin is inspired by Posteo's
+[scrambler](https://github.com/posteo/scrambler-plugin)
+which uses OpenSSL and RSA keypairs. TREES works in a
 similar way, but uses the Sodium crypto library (based on NaCL).
 
 How it works:
