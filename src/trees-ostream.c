@@ -87,7 +87,7 @@ trees_ostream_send_chunk(struct trees_ostream *sstream,
   unsigned char ciphertext[ciphertext_len];
 
   /* Extra protection here against overflow. */
-  if (chunk_size < (SSIZE_MAX - crypto_box_SEALBYTES)) {
+  if (chunk_size >= (SSIZE_MAX - crypto_box_SEALBYTES)) {
     sstream->ostream.ostream.stream_errno = EIO;
     goto err;
   }
