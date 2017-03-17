@@ -1,5 +1,5 @@
 AC_PREREQ([2.64])
-AC_INIT([trees],[2.0.0],[https://0xacab.org/riseuplabs/trees/issues],
+AC_INIT([trees],[2.1.0],[https://0xacab.org/riseuplabs/trees/issues],
         [trees-plugin],[https://0xacab.org/riseuplabs/trees.git])
 
 AC_CONFIG_HEADERS([trees-config.h])

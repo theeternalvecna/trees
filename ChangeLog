@@ -1,4 +1,8 @@
-2015-07-17 trees 2.0.0 (First Drumpf General Strike)
+2017-03-17 trees 2.1.0 (Saint Patrick's Day)
+	* Fix an overflow validation
+	* unbreak link to scrambler in README.md (caused 404)
+
+2017-02-17 trees 2.0.0 (First Drumpf General Strike)
 	* Don't use assert() for an overflow check
 	* Use SSIZE_MAX in trees_ostream_send_chunk() check
 	* Handle error code in trees_ostream_send_header()
