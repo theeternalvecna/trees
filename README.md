@@ -42,13 +42,12 @@ Requirements
 Installation
 -------------------------------------
 
-* Run `autogen.sh` and then `./configure`.
+* Run `autogen.sh` and then
+  `./configure --with-moduledir=/usr/lib/dovecot/modules`.
 
 * Type `make` to compile the plugin.
 
-* Find the plugin at `src/.libs/lib18_trees_plugin.so`.
-
-* Copy to `/usr/lib/dovecot/modules/`
+* Type `make install` to install the plugin to `/usr/lib/dovecot/modules/`
 
 * Enable the plugin. For example, add `mail_plugins = expire quota trees`
   to `/etc/dovecot/conf.d/10-mail.conf`
