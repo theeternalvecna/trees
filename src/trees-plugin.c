@@ -135,7 +135,7 @@ static int
 trees_get_private_key(struct mail_user *user,
                       struct trees_user *suser)
 {
-  int have_salt;
+  int have_salt; int pwhash_alg;
   unsigned long long opslimit, memlimit;
   unsigned char pw_salt[crypto_pwhash_SALTBYTES];
   unsigned char sk_nonce[crypto_secretbox_NONCEBYTES];
@@ -186,12 +186,21 @@ trees_get_private_key(struct mail_user *user,
     goto end;
   }
 
+	/* Get the pwhash value from database and then map it. After this, the
+	 * pwhash_alg should be used with libsodium API. */
+	pwhash_alg = trees_get_integer_setting(user, "trees_pwhash_algo");
+	pwhash_alg = trees_pluging_pwhash_map(pwhash_alg);
+	if (pwhash_alg == -1) {
+		i_error("[trees] Unknown pwhash algorithm value: %d.", pwhash_alg);
+		goto error;
+	}
+
   /* Derive key from password to open the secretbox containing the private
    * key of the user. */
   if (crypto_pwhash(sk, sizeof(sk),
                     password, strlen(password), pw_salt,
                     opslimit, (size_t) memlimit,
-                    crypto_pwhash_ALG_DEFAULT) < 0) {
+                    pwhash_alg) < 0) {
     user->error = p_strdup_printf(user->pool,
                                   "Unable to derive private key for user %s.",
                                   user->username);

@@ -23,6 +23,24 @@
 #ifndef TREES_PLUGIN_H
 #define TREES_PLUGIN_H
 
+/* Map pwhash libsodium hash values internally so we can match them to the
+ * database field pwhash_algo. We do this because we don't want to rely on
+ * libsodium ABI for which they happily remove things. */
+static inline int
+trees_pluging_pwhash_map(int value)
+{
+	switch (value) {
+	case 0:
+		/* argon2i, libsodium <= 1.0.14. */
+		return crypto_pwhash_ALG_ARGON2I13;
+	case 1:
+		/* argon2id, libsodium >= 1.0.15 */
+		return crypto_pwhash_ALG_ARGON2ID13;
+	default:
+		return -1;
+	}
+}
+
 void trees_plugin_init(struct module *module);
 void trees_plugin_deinit(void);
 
