@@ -431,5 +431,9 @@ trees_istream_create(struct istream *input,
   sstream->out_byte_count = 0;
 #endif
 
+#if DOVECOT_PREREQ(2, 3)
+	return i_stream_create(&sstream->istream, input, i_stream_get_fd(input), 0);
+#else
   return i_stream_create(&sstream->istream, input, i_stream_get_fd(input));
+#endif /* DOVECOT_PREREQ */
 }

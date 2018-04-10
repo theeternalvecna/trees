@@ -174,7 +174,14 @@ trees_ostream_sendv(struct ostream_private *stream,
 static int
 trees_ostream_flush(struct ostream_private *stream)
 {
+  /* This is pretty ugly but unfortunately between 2.2 and 2.3, Dovecot changed
+   * the expected value to be non zero in 2.3+ . */
+#if DOVECOT_PREREQ(2, 3)
+  ssize_t result = 1;
+#else
   ssize_t result = 0;
+#endif /* DOVECOT_PREREQ */
+
   struct trees_ostream *sstream = (struct trees_ostream *) stream;
 
   if (sstream->flushed) {
