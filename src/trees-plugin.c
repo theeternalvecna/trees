@@ -147,6 +147,14 @@ trees_get_private_key(struct mail_user *user,
                           crypto_box_SECRETKEYBYTES];
   const char *password;
 
+	/* We check if we have direct access to the secretbox key which will make us
+	 * bypass the entire pwhash process. If to, we go directly to open the
+	 * secretbox. This is used for SSO or secret key caching mechanism. */
+  if (trees_get_user_hexdata(user, "trees_secretbox_key",
+                             sk, sizeof(sk)) == 0) {
+    goto secretbox;
+  }
+
   /* Get the user password that we'll use to . */
   password = trees_get_string_setting(user, "trees_password");
 
@@ -154,16 +162,6 @@ trees_get_private_key(struct mail_user *user,
    * user private data so stop now. */
   if (password == NULL) {
     goto end;
-  }
-
-  /* Get the nonce. */
-  if (trees_get_user_hexdata(user, "trees_sk_nonce",
-                                 sk_nonce, sizeof(sk_nonce))) {
-    user->error = p_strdup_printf(user->pool,
-                                  "Unable to find nonce value for user %s.",
-                                  user->username);
-    i_error("[trees] Unable to get sk_nonce.");
-    goto error;
   }
 
   /* Get the opslimit and memlimit. */
@@ -208,9 +206,22 @@ trees_get_private_key(struct mail_user *user,
     goto error;
   }
 
+secretbox:
+
+  /* Get the secretbox data. */
   if (trees_get_user_hexdata(user, "trees_locked_secretbox",
                                  secretbox, sizeof(secretbox))) {
     i_error("[trees] Unable to get locked_secretbox");
+    goto error;
+  }
+
+  /* Get the nonce. */
+  if (trees_get_user_hexdata(user, "trees_sk_nonce",
+                             sk_nonce, sizeof(sk_nonce))) {
+    user->error = p_strdup_printf(user->pool,
+                                  "Unable to find nonce value for user %s.",
+                                  user->username);
+    i_error("[trees] Unable to get sk_nonce.");
     goto error;
   }
 
