@@ -84,7 +84,9 @@ An example database scheme for this might be:
     CREATE TABLE `storage_keys` (
       `id` int(11) NOT NULL AUTO_INCREMENT,
       `enabled` tinyint(4) DEFAULT '1',
+      `version` tinyint(4) DEFAULT '1',
       `public_key` text,
+      `pwhash_algo` tinyint(4) DEFAULT '1',
       `pwhash_opslimit` int(11) DEFAULT NULL,
       `pwhash_memlimit` int(11) DEFAULT NULL,
       `pwhash_salt` varchar(255) DEFAULT NULL,
@@ -98,6 +100,7 @@ NOTE: the database MUST NOT store the argon2 digest, since this value is the
 secret key that unlocks `locked_secretbox`. This is very different than how
 password hashing for authentication works, where the digest and parameters are
 stored.
+pwhash_algo is 0 for libsodium <= 1.0.14 and 1 for libsodium >= 1.0.15
 
 Dovecot Configuration
 -------------------------------------
@@ -157,9 +160,11 @@ Here is a dovecot SQL query configuration that will work with the sample
       CONCAT('/maildir/', mailboxes.maildir)    AS userdb_home, \
       REPLACE('%w', '%%', '%%%%')               AS userdb_trees_password, \
       storage_keys.enabled                      AS userdb_trees_enabled, \
+      storage_keys.version                      AS userdb_trees_version, \
       storage_keys.public_key                   AS userdb_trees_public_key, \
       storage_keys.locked_secretbox             AS userdb_trees_locked_secretbox, \
       storage_keys.sk_nonce                     AS userdb_trees_sk_nonce, \
+      storage_keys.pwhash_algo                  AS userdb_trees_pwhash_algo, \
       storage_keys.pwhash_opslimit              AS userdb_trees_pwhash_opslimit, \
       storage_keys.pwhash_memlimit              AS userdb_trees_pwhash_memlimit, \
       storage_keys.pwhash_salt                  AS userdb_trees_pwhash_salt \
@@ -180,6 +185,7 @@ Here is a dovecot SQL query configuration that will work with the sample
       8                                         AS gid, \
       CONCAT('/maildir/', mailboxes.maildir)    AS home, \
       storage_keys.enabled                      AS trees_enabled, \
+      storage_keys.version                      AS userdb_trees_version, \
       storage_keys.public_key                   AS trees_public_key, \
       CONCAT('*:bytes=', mailboxes.quota)       AS quota_rule \
       FROM mailboxes \
