@@ -27,16 +27,20 @@ end
 def usage
   puts "USAGE:"
   puts "   trees-create --password PASSWORD [OPTIONS]"
+  puts "   trees-create --password PASSWORD --old-password PASSWORD OPTIONS"
   puts
   puts "OPTIONS may include:"
-  puts "   --opslimit OPSLIMIT -- argon2 ops limit, integer in 3..10, or one of"
-  puts "                          'interactive', 'moderate', 'sensitive'"
-  puts "   --memlimit MEMLIMIT -- argon2 memory limit, in bytes, or one of"
-  puts "                          'interactive', 'moderate', 'sensitive'"
-  puts "   --salt SALT         -- hex encoded salt for password digest,"
-  puts "                          #{StorageKey::SALT_BYTES} bytes in length"
-  puts "   --nonce NONCE       -- hex encoded nonce for secretbox encryption of"
-  puts "                          private key, #{StorageKey::NONCE_BYTES} bytes in length"
+  puts "   --opslimit OPSLIMIT     -- argon2 ops limit, integer in 3..10, or one of"
+  puts "                              'interactive', 'moderate', 'sensitive'"
+  puts "   --memlimit MEMLIMIT     -- argon2 memory limit, in bytes, or one of"
+  puts "                              'interactive', 'moderate', 'sensitive'"
+  puts "   --salt SALT             -- hex encoded salt for password digest,"
+  puts "                              #{StorageKey::SALT_BYTES} bytes in length"
+  puts "   --nonce NONCE           -- hex encoded nonce for secretbox encryption of"
+  puts "                              private key, #{StorageKey::NONCE_BYTES} bytes in length"
+  puts "   --secretbox SECRETBOX   -- hex encoded secretbox"
+  puts
+  puts "for password change all options are required"
   exit 1
 end
 
@@ -46,6 +50,9 @@ def main
 
   while ARGV.any?
     case ARGV.first
+    when "--old-password"
+      ARGV.shift
+      old_password = ARGV.shift
     when "--password"
       ARGV.shift
       password = ARGV.shift
@@ -61,12 +68,19 @@ def main
     when "--nonce"
       ARGV.shift
       st.sk_nonce = ARGV.shift
+    when "--secretbox"
+      ARGV.shift
+      st.locked_secretbox = ARGV.shift
     else
       usage
     end
   end
   usage unless password
-  st.generate_new_keypair(password)
+  if old_password.nil?
+    st.generate_new_keypair(password)
+  else
+    st.change_password(old_password, password)
+  end
   puts st.to_s
 end
 
@@ -115,6 +129,14 @@ class StorageKey
 
   def generate_new_keypair(password)
     key = self.new_key()
+    self.encrypt_key(
+      key: key,
+      password: password
+    )
+  end
+
+  def change_password(old_password, password)
+    key = self.decrypt_key(old_password)
     self.encrypt_key(
       key: key,
       password: password
