@@ -42,7 +42,7 @@ trees_initialize(void)
     i_info("trees plugin libsodium failed to initialized.");
     return -1;
   }
-  i_info("trees plugin initialized");
+  i_debug("trees plugin initialized");
   return 0;
 }
 
