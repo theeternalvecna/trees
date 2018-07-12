@@ -138,7 +138,7 @@ trees_istream_read_detect(struct trees_istream *sstream)
   i_stream_set_max_buffer_size(sstream->istream.parent,
                                MAX_ISTREAM_BUFFER_SIZE);
 
-  result = trees_istream_read_parent(sstream, MAGIC_SIZE, 0);
+  result = trees_istream_read_parent(sstream, HEADER_SIZE, 0);
   if (result <= 0) {
     /* Make sure we return an error here. */
     result = -1;
