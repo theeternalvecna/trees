@@ -33,7 +33,7 @@ trees_pluging_pwhash_map(int value)
 	case 0:
 		/* argon2i, libsodium <= 1.0.14. */
 		return crypto_pwhash_ALG_ARGON2I13;
-#ifdef crypto_pwhash_ALG_ARGON2IDI3
+#ifdef crypto_pwhash_ALG_ARGON2ID13
 	case 1:
 		/* argon2id, libsodium >= 1.0.15 */
 		return crypto_pwhash_ALG_ARGON2ID13;
