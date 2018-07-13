@@ -1,0 +1,25 @@
+---
+
+- name: ensure system package cache is updated
+  apt:
+    update_cache: "yes"
+    cache_valid_time: 7200
+
+- name: install system packages
+  become: yes
+  apt:
+    pkg: "{{ item }}"
+    state: latest
+  with_items:
+    - git
+    - curl
+    - wget
+    - python3-software-properties
+
+- name: install extra packages
+  become: yes
+  apt:
+    pkg: "{{ item }}"
+    state: latest
+  with_items: "{{ extra_packages }}"
+

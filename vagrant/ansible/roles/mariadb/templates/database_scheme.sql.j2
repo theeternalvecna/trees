@@ -1,0 +1,69 @@
+DROP TABLE IF EXISTS `virtual_aliases`;
+DROP TABLE IF EXISTS `virtual_users`;
+DROP TABLE IF EXISTS `virtual_storage_keys`;
+DROP TABLE IF EXISTS `virtual_domains`;
+
+CREATE TABLE `virtual_domains` (
+`id`  INT NOT NULL AUTO_INCREMENT,
+`name` VARCHAR(50) NOT NULL,
+PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `virtual_aliases` (
+`id` INT NOT NULL AUTO_INCREMENT,
+`domain_id` INT NOT NULL,
+`source` varchar(100) NOT NULL,
+`destination` varchar(100) NOT NULL,
+PRIMARY KEY (`id`),
+FOREIGN KEY (domain_id) REFERENCES virtual_domains(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `virtual_users` (
+`id` INT NOT NULL AUTO_INCREMENT,
+`domain_id` INT NOT NULL,
+`password` VARCHAR(106) NOT NULL,
+`email` VARCHAR(120) NOT NULL,
+`quota` int(10) unsigned DEFAULT NULL,
+PRIMARY KEY (`id`),
+UNIQUE KEY `email` (`email`),
+FOREIGN KEY (domain_id) REFERENCES virtual_domains(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `virtual_storage_keys` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `enabled` tinyint(4) DEFAULT '1',
+  `version` tinyint(4) DEFAULT '1',
+  `public_key` text,
+  `pwhash_algo` tinyint(4) DEFAULT '{{ trees.pwhash_algo }}',
+  `pwhash_opslimit` int(11) DEFAULT NULL,
+  `pwhash_memlimit` int(11) DEFAULT NULL,
+  `pwhash_salt` varchar(255) DEFAULT NULL,
+  `sk_nonce` varchar(255) DEFAULT NULL,
+  `locked_secretbox` text,
+  `user_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `virtual_domains`
+(`id` ,`name`)
+VALUES
+('1', 'trees.testing');
+
+
+INSERT INTO `virtual_users`
+(`id`, `domain_id`, `password`, `email`, `quota`)
+VALUES
+('1', '1', '$argon2i$v=19$m=32768,t=4,p=1$1wGYtVOwMzSXjPhUWzMnKA$/yuWQudE0PEzRB2r8fTEY124xn/4AgiEE52fK1tJnRg', 'admin@trees.testing', '1000'),
+('2', '1', '$argon2i$v=19$m=32768,t=4,p=1$1mGXs6Zk4ozi1Z4Z9zCRqg$FDMMbq2/5LhvSm4HFII6Cj0ITsDzsghdEvwSEftv470', 'treesenabled@trees.testing', '1000');
+
+INSERT INTO `virtual_aliases`
+(`id`, `domain_id`, `source`, `destination`)
+VALUES
+('1', '1', 'alias@trees.testing', 'admin@trees.testing');
+
+INSERT INTO `virtual_storage_keys`
+(`id`, `enabled`, `version`, `public_key`, `pwhash_algo`,  `pwhash_opslimit`, `pwhash_memlimit`, `pwhash_salt`, `sk_nonce`, `locked_secretbox`, `user_id`)
+VALUES
+(1,0,1,'','','','', '', '', '', '1' ),
+(2,1,1,'431ab6dffbccac7268e3824fcbbc8327c46def96a3006cc019bc861d9393af4a','0','4','33554432', 'e94849d31c15d55eae44e8408338c519', '156ea45b6604dc769c6c0408faf3caecee28c305cca3f4a7', '52d61d7138effeb51e5883454d6c266c636780653b4eb59dac2047a73fb0c53cd08b91316ba27657e97e9f390d03d784', '2' );

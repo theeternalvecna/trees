@@ -1,0 +1,88 @@
+---
+
+- name: ensure mail user is present
+  user:
+    name: vmail
+    home: /var/vmail
+    shell: /bin/false
+    state: present
+    uid: 5000
+
+- name: ensure mail home is present
+  file:
+    path: /var/vmail
+    state: directory
+    owner: vmail
+    group: vmail
+    mode: "u+rw,g+rw,o-rwx"
+
+- name: ensure domain directory is present
+  file:
+    path: "/var/vmail/{{ dovecot_mail_name }}"
+    state: directory
+    owner: vmail
+    group: vmail
+
+- name: ensure dovecot is installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - dovecot-core
+    - dovecot-common
+    - dovecot-imapd
+    - dovecot-pop3d
+    - dovecot-mysql
+
+- name: ensure config directory is present
+  file:
+    path: /etc/dovecot/
+    owner: root
+    group: root
+    mode: 0755
+    state: directory
+
+- name: ensure dovecot config is latest
+  template:
+    src: dovecot.conf.j2
+    dest: /etc/dovecot/dovecot.conf
+    owner: root
+    group: root
+    mode:  0644
+  notify: restart dovecot
+
+- name: ensure additional dovecot config are latest
+  template:
+    src: "dovecot/conf.d/{{ item }}.j2"
+    dest: /etc/dovecot/conf.d/{{ item }}
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+   - 10-master.conf
+   - 10-mail.conf
+   - 10-auth.conf
+   - auth-sql.conf.ext
+  notify: restart dovecot
+
+- name: ensure dovecot database connector is latest
+  template:
+    src: dovecot-sql.conf.ext.j2
+    dest: /etc/dovecot/dovecot-sql.conf.ext
+    owner: root
+    group: dovecot
+    mode:  0640
+  notify: restart dovecot
+
+- name: ensure systemd directory is present
+  file:
+    path: /etc/systemd/system/dovecot.service.d/
+    owner: root
+    group: root
+    mode: 0755
+    state: directory
+
+# disable index files:
+# https://wiki.dovecot.org/IndexFiles
+
+- meta: flush_handlers

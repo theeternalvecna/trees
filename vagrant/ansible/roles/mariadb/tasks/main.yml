@@ -1,0 +1,42 @@
+---
+
+- name: ensure mariadb packages are installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - mariadb-server
+    - python-mysqldb
+
+- name: ensure mysql database is absent
+  mysql_db:
+    name: "{{ mysql.database }}"
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_password|default(omit) }}"
+  when: mysql.reset_db
+
+- name: template database scheme
+  template:
+    src: database_scheme.sql.j2
+    dest: /tmp/database_scheme.sql
+  register: __db_setup
+
+
+- name: ensure mysql database is present
+  mysql_db:
+    name: "{{ mysql.database }}"
+    state: import
+    login_user: root
+    login_password: "{{ mysql_password|default(omit) }}"
+    target: /tmp/database_scheme.sql
+  when: __db_setup.changed or mysql.reset_db
+
+- name: ensure mysql user is present
+  mysql_user:
+    name: "{{ mysql.user }}"
+    state: present
+    password: "{{ mysql.user_password }}"
+    priv: "{{ mysql.database }}.*:ALL"
+    login_user: root
+    login_password: "{{ mysql_password|default(omit) }}"

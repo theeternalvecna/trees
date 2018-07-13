@@ -1,0 +1,19 @@
+---
+
+- name: ensure ruby dependencies are installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+    update_cache: yes
+  with_items:
+    - ruby
+    - ruby-dev
+
+- name: install gem rbnacl and rbnacl-libsodium
+  gem:
+    name: "{{ item }}"
+    state: present
+    user_install: no
+  with_items:
+    - rbnacl
+    - rbnacl-libsodium
