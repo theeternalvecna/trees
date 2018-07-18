@@ -1,6 +1,6 @@
 ---
 
-- name: ensure posftix is installed
+- name: ensure postfix is installed
   apt:
     pkg: "{{ item }}"
     state: present

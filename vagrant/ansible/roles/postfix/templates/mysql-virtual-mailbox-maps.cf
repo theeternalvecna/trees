@@ -2,4 +2,4 @@ user = {{ mysql.user }}
 password = {{ mysql.user_password }}
 hosts = 127.0.0.1
 dbname = {{ mysql.database }}
-query = SELECT 1 FROM virtual_users WHERE email='%s' AND deleted=0
+query = SELECT 1 FROM virtual_users WHERE email='%s'
