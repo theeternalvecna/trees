@@ -25,7 +25,7 @@ steps:
 
 To use this box you need the following software:
 
-- [Ansible](https://www.ansible.com/) (> 2.0)
+- [Ansible](https://www.ansible.com/) (>= 2.4)
 - [VirtualBox](https://www.virtualbox.org/) 
 - [Vagrant](https://www.vagrantup.com/)
 
