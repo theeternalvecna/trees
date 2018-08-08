@@ -1,0 +1,51 @@
+---
+
+- name: ensure compilation dependencies are installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - build-essential
+    - dovecot-core
+    - dovecot-dev
+    - autoconf
+    - libtool
+
+- name: ensure libsodium is installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - libsodium-dev
+
+- name: clone trees repository
+  git:
+    repo: "{{ trees.repo.url }}"
+    dest: "{{ trees.repo.path }}"
+    version: "{{ trees.repo.release|default(HEAD) }}"
+    force: True
+  register: __trees_repo_clone
+
+- name: run autogen.sh (when repo changed)
+  command: "/bin/bash autogen.sh"
+  args:
+    chdir: "{{ trees.repo.path }}"
+  when: __trees_repo_clone.changed
+
+- name: run configure with module dir option (when repo changed)
+  command: "./configure --with-moduledir=/usr/lib/dovecot/modules"
+  args:
+    chdir: "{{ trees.repo.path }}"
+  when: __trees_repo_clone.changed
+
+- name: run make to build trees target (when repo changed)
+  make:
+    chdir: "{{ trees.repo.path }}"
+  when: __trees_repo_clone.changed
+
+- name: run make install to build trees plugin (when repo changed)
+  make:
+    chdir: "{{ trees.repo.path }}"
+    target: install
+  become: yes
+  when: __trees_repo_clone.changed

@@ -1,0 +1,40 @@
+---
+- hosts: all
+  become: true
+  vars:
+    extra_packages:
+      - mailutils
+    # trees.testing
+    dovecot_mail_name: "{{ inventory_hostname }}"
+    dovecot_mailbox_type: maildir
+    dovecot_libsodium_plugin:
+      repo:
+        url: https://github.com/LuckyFellow/dovecot-libsodium-plugin/
+        path: /opt/local/sources/dovecot-libsodium-plugin
+    mysql:
+      database: mailserver
+      user: mailserver
+      user_password: treesftw
+      reset_db: False
+    # trees.testing
+    postfix_mail_name: "{{ inventory_hostname }}"
+    postfix_mynetwork: "{{ ansible_default_ipv4.network }}/24"
+    trees:
+      repo:
+        url: https://0xacab.org/riseuplabs/trees
+        path: /opt/local/sources/trees/
+        # specify latest release, e.g. HEAD, v2.1.0
+        # or use the commit hash sum to clone specific commit
+        release: "HEAD"
+      pwhash_algo: 0
+      # pwhash_algo:
+      # 0 for libsodium <= 1.0.14 (Debian Stretch Package)
+      #  - install libsodium from normal debian repos (current version 1.0.12)
+      #  - uses ARGON2
+  roles:
+    - init
+    - mariadb
+    - postfix
+    - dovecot
+    - trees
+

@@ -1,0 +1,43 @@
+---
+
+- name: ensure postfix is installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - postfix
+    - postfix-mysql
+
+- name: ensure postfix configs are latest
+  template:
+    src:  "{{ item }}.j2"
+    dest: /etc/postfix/{{ item }}
+    owner: root
+    group: root
+    mode: 0644
+    backup: yes
+  with_items:
+    - main.cf
+    - master.cf
+  notify: restart postfix
+
+- name: ensure postfix-mysql configuraions are latest
+  template:
+    src: "{{ item }}"
+    dest: /etc/postfix/{{ item }}
+    owner: root
+    group: root
+    mode: 0640
+  with_items:
+   - mysql-virtual-alias-maps.cf
+   - mysql-virtual-mailbox-domains.cf
+   - mysql-virtual-mailbox-maps.cf
+  notify: restart postfix
+
+- name: set /etc/mailname correctly
+  copy:
+    dest: /etc/mailname
+    content: "{{ postfix_mail_name | default(ansible_hostname)}}\n"
+    owner: root
+    group: root
+    mode: 0644

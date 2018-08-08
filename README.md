@@ -42,6 +42,9 @@ Requirements
 Installation
 -------------------------------------
 
+An example/test setup can be created through [Vagrant](./vagrant/README.md), or 
+you have to proceed the following steps:
+
 * Run `autogen.sh` and then
   `./configure --with-moduledir=/usr/lib/dovecot/modules`.
 

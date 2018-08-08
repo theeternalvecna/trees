@@ -1,0 +1,49 @@
+---
+- name: ensure compilation dependencies are installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - build-essential
+    - dovecot-core
+    - dovecot-dev
+    - autoconf
+    - libtool
+
+- name: ensure libsodium is installed
+  apt:
+    pkg: "{{ item }}"
+    state: present
+  with_items:
+    - libsodium-dev
+
+- name: clone dovecot-libsodium plugin repository
+  git:
+    repo: "{{ dovecot_libsodium_plugin.repo.url }}"
+    dest: "{{ dovecot_libsodium_plugin.repo.path }}"
+    force: True
+  register: __dovecot_libsodium_repo_clone
+
+- name: run autogen.sh (when repo changed)
+  command: "/bin/bash autogen.sh"
+  args:
+    chdir: "{{ dovecot_libsodium_plugin.repo.path }}"
+  when: __dovecot_libsodium_repo_clone.changed
+
+- name: run configure with module dir option (when repo changed)
+  command: "./configure --with-dovecot=/usr/lib/dovecot/ --with-moduledir=/usr/lib/dovecot/modules"
+  args:
+    chdir: "{{ dovecot_libsodium_plugin.repo.path }}"
+  when: __dovecot_libsodium_repo_clone.changed
+
+- name: run make to build dovecot-libsodium plugin target (when repo changed)
+  make:
+    chdir: "{{ dovecot_libsodium_plugin.repo.path }}"
+  when: __dovecot_libsodium_repo_clone.changed
+
+- name: run make install to install dovecot-libsodium plugin (when repo changed)
+  make:
+    chdir: "{{ dovecot_libsodium_plugin.repo.path }}"
+    target: install
+  become: yes
+  when: __dovecot_libsodium_repo_clone.changed
