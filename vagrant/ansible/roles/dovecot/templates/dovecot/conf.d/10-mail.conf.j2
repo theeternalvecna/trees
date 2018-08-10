@@ -28,8 +28,8 @@
 # <doc/wiki/MailLocation.txt>
 #
 
-#mail_location = mdbox:/var/vmail/%Ld/%Ln/Maildir
-mail_location = {{ dovecot_mailbox_type }}:/var/vmail/%Ld/%Ln/Maildir
+mail_home = /var/vmail/%Ld/%Ln
+mail_location = {{ dovecot_mailbox_type }}:~/Maildir
 
 # If you need to set multiple mailbox locations or want to change default
 # namespace settings, you can do it by defining namespace sections.

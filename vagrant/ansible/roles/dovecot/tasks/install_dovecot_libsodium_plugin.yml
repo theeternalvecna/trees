@@ -3,6 +3,7 @@
   apt:
     pkg: "{{ item }}"
     state: present
+    default_release: "{{ ansible_distribution_release }}-backports"
   with_items:
     - build-essential
     - dovecot-core
