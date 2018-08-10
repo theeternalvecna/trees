@@ -32,6 +32,7 @@
       #  - install libsodium from normal debian repos (current version 1.0.12)
       #  - uses ARGON2
   roles:
+    - jnv.debian-backports
     - init
     - mariadb
     - postfix
