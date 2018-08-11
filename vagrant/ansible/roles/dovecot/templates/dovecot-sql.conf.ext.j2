@@ -113,7 +113,7 @@ virtual_storage_keys.pwhash_opslimit              AS userdb_trees_pwhash_opslimi
 virtual_storage_keys.pwhash_memlimit              AS userdb_trees_pwhash_memlimit, \
 virtual_storage_keys.pwhash_salt                  AS userdb_trees_pwhash_salt \
 FROM virtual_users \
-LEFT OUTER JOIN virtual_storage_keys ON virtual_users.id = virtual_storage_keys.id \
+INNER JOIN virtual_storage_keys ON virtual_users.id = virtual_storage_keys.id \
 WHERE email='%u';
 
 
@@ -143,7 +143,7 @@ virtual_storage_keys.enabled AS trees_enabled, \
 virtual_storage_keys.version AS trees_version, \
 virtual_storage_keys.public_key AS trees_public_key \
 FROM virtual_users \
-LEFT OUTER JOIN virtual_storage_keys ON virtual_users.id = virtual_storage_keys.id \
+INNER JOIN virtual_storage_keys ON virtual_users.id = virtual_storage_keys.id \
 WHERE email='%u';
 
 
