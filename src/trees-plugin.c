@@ -135,7 +135,7 @@ static int
 trees_get_private_key(struct mail_user *user,
                       struct trees_user *suser)
 {
-  int have_salt; int pwhash_alg;
+  int have_salt; int pwhash_alg; int pwhash_alg_set;
   unsigned long long opslimit, memlimit;
   unsigned char pw_salt[crypto_pwhash_SALTBYTES];
   unsigned char sk_nonce[crypto_secretbox_NONCEBYTES];
@@ -186,10 +186,10 @@ trees_get_private_key(struct mail_user *user,
 
 	/* Get the pwhash value from database and then map it. After this, the
 	 * pwhash_alg should be used with libsodium API. */
-	pwhash_alg = trees_get_integer_setting(user, "trees_pwhash_algo");
-	pwhash_alg = trees_pluging_pwhash_map(pwhash_alg);
+	pwhash_alg_set = trees_get_integer_setting(user, "trees_pwhash_algo");
+	pwhash_alg = trees_pluging_pwhash_map(pwhash_alg_set);
 	if (pwhash_alg == -1) {
-		i_error("[trees] Unknown pwhash algorithm value: %d.", pwhash_alg);
+		i_error("[trees] Unknown pwhash algorithm value: %d.", pwhash_alg_set);
 		goto error;
 	}
 
