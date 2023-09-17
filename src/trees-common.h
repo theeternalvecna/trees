@@ -49,6 +49,29 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
+/* Fix dovecot's broken DOVECOT_PREREQ version detection macro */
+#if !defined(DOVECOT_VERSION_MAJOR) || !defined(DOVECOT_PREREQ)
+/* Version detection didn't exist before 2.1.16 */
+#  error "This plugin doesn't work with dovecot version below 2.1.16"
+#else
+/* DOVECOT_VERSION_MICRO got added in 2.3.18 */
+/* In 2.3.18, the macro got broken too, so we use that for detection */
+/* see https://github.com/dovecot/core/commit/31c2413 */
+#  if defined(DOVECOT_VERSION_MICRO)
+/* re-define the macro to the old signature */
+#    undef DOVECOT_PREREQ
+#    define DOVECOT_PREREQ(maj, min) \
+            ((DOVECOT_VERSION_MAJOR << 16) + \
+              DOVECOT_VERSION_MINOR >= ((maj) << 16) + (min))
+/* if you want to detect micro version too, use this instead */
+#    define DOVECOT_PREREQ_MICRO(maj, min, micro) \
+            ((DOVECOT_VERSION_MAJOR << 24) + \
+	         (DOVECOT_VERSION_MINOR << 16) + \
+	         DOVECOT_VERSION_MICRO >= \
+	         ((maj) << 24) + ((min) << 16) + (micro))
+#  endif /* defined(DOVECOT_VERSION_MICRO) */
+#endif /* !defined(DOVECOT_VERSION_MAJOR) || !defined(DOVECOT_PREREQ) */
+
 extern const unsigned char trees_header[3];
 
 int trees_initialize(void);
