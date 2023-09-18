@@ -48,9 +48,9 @@
 #define TREES_CONTEXT(obj) \
   MODULE_CONTEXT(obj, trees_storage_module)
 #define TREES_MAIL_CONTEXT(obj) \
-	MODULE_CONTEXT(obj, trees_mail_module)
+  MODULE_CONTEXT(obj, trees_mail_module)
 #define TREES_USER_CONTEXT(obj) \
-	MODULE_CONTEXT(obj, trees_user_module)
+  MODULE_CONTEXT(obj, trees_user_module)
 
 struct trees_user {
   /* Dovecot module context. */
@@ -147,9 +147,9 @@ trees_get_private_key(struct mail_user *user,
                           crypto_box_SECRETKEYBYTES];
   const char *password;
 
-	/* We check if we have direct access to the secretbox key which will make us
-	 * bypass the entire pwhash process. If to, we go directly to open the
-	 * secretbox. This is used for SSO or secret key caching mechanism. */
+  /* We check if we have direct access to the secretbox key which will make us
+   * bypass the entire pwhash process. If to, we go directly to open the
+   * secretbox. This is used for SSO or secret key caching mechanism. */
   if (trees_get_user_hexdata(user, "trees_secretbox_key",
                              sk, sizeof(sk)) == 0) {
     goto secretbox;
@@ -184,14 +184,14 @@ trees_get_private_key(struct mail_user *user,
     goto end;
   }
 
-	/* Get the pwhash value from database and then map it. After this, the
-	 * pwhash_alg should be used with libsodium API. */
-	pwhash_alg = trees_get_integer_setting(user, "trees_pwhash_algo");
-	pwhash_alg = trees_pluging_pwhash_map(pwhash_alg);
-	if (pwhash_alg == -1) {
-		i_error("[trees] Unknown pwhash algorithm value: %d.", pwhash_alg);
-		goto error;
-	}
+  /* Get the pwhash value from database and then map it. After this, the
+   * pwhash_alg should be used with libsodium API. */
+  pwhash_alg = trees_get_integer_setting(user, "trees_pwhash_algo");
+  pwhash_alg = trees_pluging_pwhash_map(pwhash_alg);
+  if (pwhash_alg == -1) {
+    i_error("[trees] Unknown pwhash algorithm value: %d.", pwhash_alg);
+    goto error;
+  }
 
   /* Derive key from password to open the secretbox containing the private
    * key of the user. */
