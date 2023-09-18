@@ -27,7 +27,7 @@
  * database field pwhash_algo. We do this because we don't want to rely on
  * libsodium ABI for which they happily remove things. */
 static inline int
-trees_pluging_pwhash_map(int value)
+trees_plugin_pwhash_map(int value)
 {
 	switch (value) {
 	case 0:
