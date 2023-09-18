@@ -172,7 +172,7 @@ Here is a dovecot SQL query configuration that will work with the sample
       storage_keys.pwhash_memlimit              AS userdb_trees_pwhash_memlimit, \
       storage_keys.pwhash_salt                  AS userdb_trees_pwhash_salt \
       FROM mailboxes \
-      LEFT OUTER JOIN storage_keys ON mailboxes.user_id = storage_keys.user_id \
+      INNER JOIN storage_keys ON mailboxes.user_id = storage_keys.user_id \
       WHERE mailboxes.username = '%n' AND mailboxes.domain = '%d' \
       AND mailboxes.is_active = 1
 
@@ -192,7 +192,7 @@ Here is a dovecot SQL query configuration that will work with the sample
       storage_keys.public_key                   AS trees_public_key, \
       CONCAT('*:bytes=', mailboxes.quota)       AS quota_rule \
       FROM mailboxes \
-      LEFT OUTER JOIN storage_keys ON mailboxes.user_id = storage_keys.user_id \
+      INNER JOIN storage_keys ON mailboxes.user_id = storage_keys.user_id \
       WHERE mailboxes.username = '%n' AND mailboxes.domain = '%d' \
       AND mailboxes.is_active = 1
 
